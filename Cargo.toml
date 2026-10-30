@@ -1,0 +1,32 @@
+[package]
+name = "dum-notch"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# default-features = false wajib: backend femtovg memakai ~70 MB working set.
+# Renderer software + backend winit 0.30 memberi ~18 MB working set / ~3 MB private.
+slint = { version = "1.9", default-features = false, features = [
+    "std",
+    "compat-1-2",
+    "backend-winit",
+    "renderer-software",
+    "unstable-winit-030",
+] }
+
+[dependencies.windows]
+version = "0.58"
+features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+]
+
+[build-dependencies]
+slint-build = "1.9"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

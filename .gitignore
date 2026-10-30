@@ -1,0 +1,11 @@
+/target
+**/*.rs.bk
+*.pdb
+
+# Output skrip verifikasi (scripts/verify-*.ps1 menulis ke %TEMP%, bukan ke repo)
+/scripts/out/
+
+# Sampah OS
+Thumbs.db
+desktop.ini
+.DS_Store

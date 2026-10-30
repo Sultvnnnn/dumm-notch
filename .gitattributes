@@ -1,0 +1,6 @@
+# Normalisasi akhir baris: LF untuk semua teks, CRLF hanya untuk skrip PowerShell
+# (PowerShell 5.1 membaca file LF dengan baik, tapi CRLF menghindari kejutan di editor Windows).
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf

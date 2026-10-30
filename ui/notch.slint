@@ -1,0 +1,45 @@
+export component MainWindow inherits Window {
+    title: "DummNotchOverlay";
+    no-frame: true;
+    background: transparent;
+    always-on-top: true;
+
+    width: 420px;
+    height: 160px;
+
+    in-out property <bool> is_expanded: false;
+
+    pill := Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: 0px;
+
+        width: is_expanded ? 380px : 180px;
+        height: is_expanded ? 90px : 32px;
+        background: #09090b;
+        border-bottom-left-radius: 18px;
+        border-bottom-right-radius: 18px;
+
+        animate width { duration: 250ms; easing: ease-out; }
+        animate height { duration: 250ms; easing: ease-out; }
+
+        TouchArea {
+            mouse-cursor: pointer;
+            changed has-hover => {
+                root.is_expanded = self.has-hover;
+            }
+        }
+
+        HorizontalLayout {
+            padding: 8px;
+            alignment: center;
+
+            Text {
+                text: root.is_expanded ? "Dumm Active - Media & HUD Hub" : "Dumm";
+                color: #f4f4f5;
+                font-size: root.is_expanded ? 14px : 12px;
+                vertical-alignment: center;
+                horizontal-alignment: center;
+            }
+        }
+    }
+}

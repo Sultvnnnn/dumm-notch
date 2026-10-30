@@ -8,6 +8,9 @@ export component MainWindow inherits Window {
     height: 160px;
 
     in-out property <bool> is_expanded: false;
+    // Diisi layanan media; string kosong berarti tidak ada sesi.
+    in property <string> media-title;
+    in property <string> media-artist;
 
     pill := Rectangle {
         x: (parent.width - self.width) / 2;
@@ -29,15 +32,25 @@ export component MainWindow inherits Window {
             }
         }
 
-        HorizontalLayout {
+        VerticalLayout {
             padding: 8px;
             alignment: center;
 
             Text {
-                text: root.is_expanded ? "Dumm Active - Media & HUD Hub" : "Dumm";
+                text: !root.is_expanded ? "Dumm"
+                    : root.media-title != "" ? root.media-title
+                    : "Dumm Active - Media & HUD Hub";
                 color: #f4f4f5;
                 font-size: root.is_expanded ? 14px : 12px;
-                vertical-alignment: center;
+                overflow: elide;
+                horizontal-alignment: center;
+            }
+
+            if root.is_expanded && root.media-title != "" && root.media-artist != "": Text {
+                text: root.media-artist;
+                color: #f4f4f5;
+                font-size: 12px;
+                overflow: elide;
                 horizontal-alignment: center;
             }
         }

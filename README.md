@@ -20,8 +20,10 @@ Electron, no Tauri, no WebView2.
 
 ## Status
 
-Phase 1 (native window shell) is complete and verified. Phase 2 (GSMTC media, volume HUD) and
-Phase 3 (productivity shelf, focus timer) are specified in `docs/ROADMAP.md`.
+Phase 1 (native window shell) is complete and verified. Phase 2 is under way: the media slice
+reads the active GSMTC session and shows title and artist in the expanded pill, fully
+event-driven. Transport controls, artwork, the volume HUD and Phase 3 remain, as specified in
+`docs/ROADMAP.md`.
 
 ## Stack
 
@@ -78,6 +80,8 @@ src/window/mod.rs        single entry point: init_overlay -> attach -> style -> 
 src/window/attach.rs     locate the HWND on the first winit event
 src/window/style.rs      WS_EX_TOOLWINDOW in, WS_EX_APPWINDOW out
 src/window/position.rs   center horizontally, pin to y = 0, keep topmost
+src/services/media.rs    GSMTC session service thread: title/artist, event-driven, no polling
+src/services/mod.rs      message types shared with the UI (no Slint types)
 ui/notch.slint           declarative UI: pill, expansion animation, hover state
 scripts/verify-*.ps1     DoD harnesses (hover geometry, idle CPU)
 docs/PRD.md              product requirements

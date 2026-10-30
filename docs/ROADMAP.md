@@ -52,6 +52,10 @@ tidak ada di taskbar/Alt-Tab, dan proses idle benar-benar diam.
 **Tujuan:** notch menampilkan judul/artis/artwork dan mengendalikan play-pause/next/prev
 tanpa polling, plus HUD volume saat berubah.
 
+**Status:** potongan pertama selesai — metadata read-only (judul, artis, pergantian sesi) lewat
+`src/services/media.rs`, terverifikasi pada 2.1 dan 2.8. Kontrol transport, artwork, dan volume
+belum dikerjakan.
+
 ### Scope
 
 1. `src/services/media.rs`: `GlobalSystemMediaTransportControlsSessionManager` di thread

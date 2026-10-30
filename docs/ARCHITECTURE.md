@@ -15,7 +15,7 @@ Tidak ada Electron, Tauri, WebView2, maupun runtime terkelola.
 | --- | --- |
 | Nol polling | Tidak ada `loop { sleep }` dan tidak ada timer berkala. Semua reaksi berasal dari event handler Slint/winit atau callback Win32/WinRT. |
 | Satu proses, satu thread UI | Slint, winit, dan seluruh pemanggilan Win32 UI berjalan di thread main. Tanpa `Send/Sync` lintas thread untuk `MainWindow`. |
-| FFI sebagai lapisan tipis | Semua `unsafe` dibatasi di `src/window/style.rs` dan `src/window/position.rs`, masing-masing dengan blok `// SAFETY:` dan signature `-> windows::core::Result<()>`. |
+| FFI sebagai lapisan tipis | Semua `unsafe` dibatasi di `src/window/style.rs`, `src/window/position.rs`, dan `src/services/media.rs` (`RoInitialize`/`RoUninitialize`), masing-masing dengan blok `// SAFETY:` dan signature `-> windows::core::Result<()>`. |
 | UI deklaratif | `ui/*.slint` hanya berisi tampilan dan properti; tidak ada logika sistem. |
 | Gagal lunak | Kegagalan satu fitur (mis. media session tidak tersedia) menonaktifkan fitur itu, bukan menghentikan aplikasi. |
 
@@ -182,6 +182,7 @@ Pengukuran pada build release, window idle, tanpa animasi berjalan:
 | Slint, backend default (femtovg/GL), debug | ~70 MB | ~32 MB | Baseline "cara gampang" |
 | Slint, winit-software, debug | ~25 MB | ~3,8 MB | Sebelum optimasi build |
 | Slint, winit-software, release | **~17,8 MB** | **~3,1 MB** | Konfigurasi yang dipakai |
+| Slint, winit-software, release + sesi media aktif | ~22,5–22,9 MB | **3,6–3,9 MB** | WinRT thread pool menambah 3–6 thread; private bytes naik ~0,7 MB |
 | .NET/WPF hello-world (referensi umum) | ~80–120 MB | ~40–60 MB | Runtime + JIT + GC heap |
 
 Penyebab selisih:

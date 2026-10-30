@@ -21,9 +21,9 @@ Electron, no Tauri, no WebView2.
 ## Status
 
 Phase 1 (native window shell) is complete and verified. Phase 2 is under way: the media slice
-reads the active GSMTC session and shows title and artist in the expanded pill, fully
-event-driven. Transport controls, artwork, the volume HUD and Phase 3 remain, as specified in
-`docs/ROADMAP.md`.
+reads the active GSMTC session, shows title and artist in the expanded pill, and drives
+play/pause, next and previous through the same service thread — all event-driven, no polling.
+Artwork, the volume HUD and Phase 3 remain, as specified in `docs/ROADMAP.md`.
 
 ## Stack
 

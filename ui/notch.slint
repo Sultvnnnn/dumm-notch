@@ -11,6 +11,10 @@ export component MainWindow inherits Window {
     // Diisi layanan media; string kosong berarti tidak ada sesi.
     in property <string> media-title;
     in property <string> media-artist;
+    in property <bool> is-playing;
+    callback play-pause();
+    callback next();
+    callback previous();
 
     pill := Rectangle {
         x: (parent.width - self.width) / 2;
@@ -25,15 +29,35 @@ export component MainWindow inherits Window {
         animate width { duration: 250ms; easing: ease-out; }
         animate height { duration: 250ms; easing: ease-out; }
 
+        // Satu TouchArea untuk seluruh pill. TouchArea yang bersarang di dalam layout tidak
+        // menerima hit-test (terbukti dari pengujian klik: badan pill selalu menang), jadi
+        // tombol ditentukan dari posisi pointer di dalam area ini.
         TouchArea {
             mouse-cursor: pointer;
             changed has-hover => {
                 root.is_expanded = self.has-hover;
             }
+
+            clicked => {
+                if (root.is_expanded) {
+                    // Baris tombol: 28 px di bagian bawah pill, tiga tombol berdampingan
+                    // dengan pusat di width/2 - 28, width/2, dan width/2 + 28.
+                    if (self.mouse-y >= self.height - 44px && self.mouse-y <= self.height - 16px) {
+                        if (self.mouse-x < self.width / 2 - 14px) {
+                            root.previous();
+                        } else if (self.mouse-x > self.width / 2 + 14px) {
+                            root.next();
+                        } else {
+                            root.play-pause();
+                        }
+                    }
+                }
+            }
         }
 
         VerticalLayout {
-            padding: 8px;
+            padding: 6px;
+            spacing: 0px;
             alignment: center;
 
             Text {
@@ -52,6 +76,28 @@ export component MainWindow inherits Window {
                 font-size: 12px;
                 overflow: elide;
                 horizontal-alignment: center;
+            }
+
+            if root.is_expanded: HorizontalLayout {
+                alignment: center;
+                spacing: 0px;
+
+                // Ikon hanya tampilan; yang menangkap klik adalah TouchArea di atas.
+                Text {
+                    width: 28px; height: 28px;
+                    text: "⏮"; color: #f4f4f5;
+                    horizontal-alignment: center; vertical-alignment: center;
+                }
+                Text {
+                    width: 28px; height: 28px;
+                    text: root.is-playing ? "⏸" : "⏯"; color: #f4f4f5;
+                    horizontal-alignment: center; vertical-alignment: center;
+                }
+                Text {
+                    width: 28px; height: 28px;
+                    text: "⏭"; color: #f4f4f5;
+                    horizontal-alignment: center; vertical-alignment: center;
+                }
             }
         }
     }

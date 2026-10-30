@@ -3,10 +3,18 @@
 
 pub mod media;
 
+#[derive(Clone, Copy)]
+pub enum ServiceCommand {
+    TogglePlayPause,
+    Next,
+    Previous,
+}
+
 /// Status media sesi aktif. `has_session == false` berarti tidak ada sesi atau layanan mati.
 #[derive(Default)]
 pub struct MediaUpdate {
     pub title: String,
     pub artist: String,
     pub has_session: bool,
+    pub is_playing: bool,
 }

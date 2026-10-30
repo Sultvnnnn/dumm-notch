@@ -94,6 +94,22 @@ Kesimpulan: tidak ada polling di aplikasi. Wakeup berasal dari `WM_MOUSEMOVE` ya
 backend winit/Slint, termasuk saat kursor berada di area transparan window 420×160. Karena itu
 DoD idle CPU diukur dengan `scripts/verify-idle.ps1` yang hanya menghitung bucket tanpa input.
 
+### 3.2 Hit-test pointer dan tombol
+
+Tiga temuan dari pengujian klik nyata, semuanya memengaruhi desain:
+
+1. **`RoInitialize` harus di thread layanan.** Memanggilnya di thread UI winit gagal dengan
+   `RPC_E_CHANGED_MODE`.
+2. **`TouchArea` bersarang di dalam layout tidak menerima hit-test.** Tiga tombol 28×28 di dalam
+   `HorizontalLayout` tidak pernah memicu `clicked`; klik selalu jatuh ke `TouchArea` badan pill.
+   Solusinya satu `TouchArea` untuk seluruh pill, lalu tombol ditentukan dari `mouse-x` dan
+   `mouse-y` relatif terhadap pill. Ikon tetap elemen `Text` biasa tanpa penanganan input.
+3. **Klik sintetis `mouse_event` tidak sampai ke overlay yang tidak pernah aktif.** Window ini
+   dibuat tanpa aktivasi (`SWP_NOACTIVATE`, `WS_EX_TOOLWINDOW`), sehingga injeksi input sistem
+   tidak diteruskan. Pengujian harus mengirim `WM_LBUTTONDOWN`/`WM_LBUTTONUP` lewat
+   `PostMessage` ke HWND `DummNotchOverlay`, dengan koordinat klien. Ini hanya berlaku untuk
+   harness, bukan untuk pengguna: klik mouse fisik tetap bekerja normal.
+
 ---
 
 ## 4. Struktur Modul

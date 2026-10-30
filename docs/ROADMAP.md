@@ -53,7 +53,8 @@ tidak ada di taskbar/Alt-Tab, dan proses idle benar-benar diam.
 tanpa polling, plus HUD volume saat berubah.
 
 **Status:** potongan pertama selesai — metadata read-only (judul, artis, pergantian sesi) lewat
-`src/services/media.rs`, terverifikasi pada 2.1 dan 2.8. Kontrol transport, artwork, dan volume
+`src/services/media.rs`, terverifikasi pada 2.1 dan 2.8. Potongan kedua selesai — kontrol
+transport prev / play-pause / next, terverifikasi pada 2.2, 2.3, dan 2.7. Artwork dan volume
 belum dikerjakan.
 
 ### Scope

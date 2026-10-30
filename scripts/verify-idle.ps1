@@ -11,7 +11,10 @@ param(
     [string]$Exe = "D:\codingan\dumm-notch\target\release\dum-notch.exe",
     [int]$Runs = 3,
     [int]$Buckets = 60,
-    [int]$IdleThresholdSec = 2
+    [int]$IdleThresholdSec = 2,
+    # Toleransi CPU pada bucket tanpa input. 0 = kriteria Phase 1 (idle murni).
+    # Sesi media aktif menambah wakeup sporadis ~1 kuantum (15,6 ms), jadi Phase 2 memakai 50.
+    [int]$ToleranceMs = 0
 )
 
 Add-Type @"
@@ -67,7 +70,7 @@ for ($r = 1; $r -le $Runs; $r++) {
     }
 
     $p.Refresh()
-    $verdict = if ($freeMs -eq 0) { "LULUS" } else { $semuaLulus = $false; "GAGAL" }
+    $verdict = if ($freeMs -le $ToleranceMs) { "LULUS" } else { $semuaLulus = $false; "GAGAL" }
     "RUN {0}: {1}" -f $r, $verdict
     "  bucket_tanpa_input={0} cpu_ms_tanpa_input={1:N0}" -f $freeN, $freeMs
     "  bucket_ada_input={0}  cpu_ms_ada_input={1:N0}" -f $inputN, $inputMs
@@ -78,4 +81,4 @@ for ($r = 1; $r -le $Runs; $r++) {
     Start-Sleep -Milliseconds 400
 }
 
-if ($semuaLulus) { "HASIL: LULUS semua run (0 ms CPU pada bucket tanpa input)" } else { "HASIL: GAGAL" }
+if ($semuaLulus) { "HASIL: LULUS semua run (CPU pada bucket tanpa input <= $ToleranceMs ms)" } else { "HASIL: GAGAL" }

@@ -12,23 +12,28 @@ use windows::Foundation::{EventRegistrationToken, TypedEventHandler};
 use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSession as Session,
     GlobalSystemMediaTransportControlsSessionManager as Manager,
+    GlobalSystemMediaTransportControlsSessionPlaybackStatus as PlaybackStatus,
 };
 use windows::Win32::System::WinRT::{RO_INIT_MULTITHREADED, RoInitialize, RoUninitialize};
 
-use super::MediaUpdate;
+use super::{MediaUpdate, ServiceCommand};
 
-enum Signal {
+pub enum Signal {
     SessionChanged,
     PropertiesChanged,
+    PlaybackChanged,
+    Command(ServiceCommand),
 }
 
 /// Menyalakan thread layanan media. `sink` dipanggil dari thread layanan setiap ada perubahan.
 /// Bila layanan gagal atau berhenti, `sink` menerima `has_session: false` sebagai pesan terakhir.
-pub fn spawn(sink: impl Fn(MediaUpdate) + Send + 'static) {
+pub fn spawn(sink: impl Fn(MediaUpdate) + Send + 'static) -> mpsc::Sender<Signal> {
+    let (tx, rx) = mpsc::channel();
+    let worker_tx = tx.clone();
     let spawned = thread::Builder::new()
         .name("dumm-media".into())
         .spawn(move || {
-            if let Err(error) = run(&sink) {
+            if let Err(error) = run(&sink, worker_tx, rx) {
                 eprintln!("[dumm] layanan media berhenti: {error}");
             }
             sink(MediaUpdate::default());
@@ -36,6 +41,7 @@ pub fn spawn(sink: impl Fn(MediaUpdate) + Send + 'static) {
     if let Err(error) = spawned {
         eprintln!("[dumm] thread layanan media gagal dibuat: {error}");
     }
+    tx
 }
 
 /// Melepas apartemen WinRT saat thread layanan selesai. Dideklarasikan sebelum objek WinRT
@@ -50,13 +56,12 @@ impl Drop for Apartment {
     }
 }
 
-fn run(sink: &impl Fn(MediaUpdate)) -> windows::core::Result<()> {
+fn run(sink: &impl Fn(MediaUpdate), tx: mpsc::Sender<Signal>, rx: mpsc::Receiver<Signal>) -> windows::core::Result<()> {
     // SAFETY: dipanggil sekali di awal thread baru, sebelum objek WinRT apa pun dibuat.
     unsafe { RoInitialize(RO_INIT_MULTITHREADED)? };
     let _apartment = Apartment;
 
     let manager = Manager::RequestAsync()?.get()?;
-    let (tx, rx) = mpsc::channel();
 
     let session_tx = tx.clone();
     let session_token = manager.CurrentSessionChanged(&TypedEventHandler::new(move |_, _| {
@@ -71,6 +76,24 @@ fn run(sink: &impl Fn(MediaUpdate)) -> windows::core::Result<()> {
     // Blocking: thread tidur sampai WinRT mengirim sinyal. `tx` tetap hidup di sini,
     // jadi loop hanya berakhir bersama proses.
     for signal in &rx {
+        if let Signal::Command(command) = signal {
+            if let Some((session, _, _)) = watched.as_ref() {
+                // Jangan kendalikan sesi lama setelah sesi aktif berubah.
+                if manager.GetCurrentSession().is_ok_and(|current| current == *session) {
+                    let result = match command {
+                        ServiceCommand::TogglePlayPause => session.TryTogglePlayPauseAsync(),
+                        ServiceCommand::Next => session.TrySkipNextAsync(),
+                        ServiceCommand::Previous => session.TrySkipPreviousAsync(),
+                    }.and_then(|op| op.get());
+                    match result {
+                        Ok(true) => {},
+                        Ok(false) => sink(snapshot(watched.as_ref())),
+                        Err(error) => eprintln!("[dumm] perintah media gagal: {error}"),
+                    }
+                }
+            }
+            continue;
+        }
         if matches!(signal, Signal::SessionChanged) {
             watched = watch_current(&manager, &tx, watched);
         }
@@ -85,21 +108,33 @@ fn run(sink: &impl Fn(MediaUpdate)) -> windows::core::Result<()> {
 fn watch_current(
     manager: &Manager,
     tx: &mpsc::Sender<Signal>,
-    previous: Option<(Session, EventRegistrationToken)>,
-) -> Option<(Session, EventRegistrationToken)> {
-    if let Some((session, token)) = previous {
+    previous: Option<(Session, EventRegistrationToken, EventRegistrationToken)>,
+) -> Option<(Session, EventRegistrationToken, EventRegistrationToken)> {
+    if let Some((session, token, playback_token)) = previous {
         // Sesi lama bisa sudah hilang bersama pemutarnya; gagal melepas tidak mengubah apa pun.
         let _ = session.RemoveMediaPropertiesChanged(token);
+        let _ = session.RemovePlaybackInfoChanged(playback_token);
     }
 
     let session = manager.GetCurrentSession().ok()?;
+    let playback_tx = tx.clone();
     let tx = tx.clone();
     let handler = TypedEventHandler::new(move |_, _| {
         let _ = tx.send(Signal::PropertiesChanged);
         Ok(())
     });
     match session.MediaPropertiesChanged(&handler) {
-        Ok(token) => Some((session, token)),
+        Ok(token) => match session.PlaybackInfoChanged(&TypedEventHandler::new(move |_, _| {
+            let _ = playback_tx.send(Signal::PlaybackChanged);
+            Ok(())
+        })) {
+            Ok(playback_token) => Some((session, token, playback_token)),
+            Err(error) => {
+                let _ = session.RemoveMediaPropertiesChanged(token);
+                eprintln!("[dumm] langganan PlaybackInfoChanged gagal: {error}");
+                None
+            }
+        },
         Err(error) => {
             eprintln!("[dumm] langganan MediaPropertiesChanged gagal: {error}");
             None
@@ -107,8 +142,8 @@ fn watch_current(
     }
 }
 
-fn snapshot(watched: Option<&(Session, EventRegistrationToken)>) -> MediaUpdate {
-    let Some((session, _)) = watched else {
+fn snapshot(watched: Option<&(Session, EventRegistrationToken, EventRegistrationToken)>) -> MediaUpdate {
+    let Some((session, _, _)) = watched else {
         return debug_log(MediaUpdate::default());
     };
     let update = match session.TryGetMediaPropertiesAsync().and_then(|op| op.get()) {
@@ -116,6 +151,7 @@ fn snapshot(watched: Option<&(Session, EventRegistrationToken)>) -> MediaUpdate 
             title: props.Title().unwrap_or_default().to_string_lossy(),
             artist: props.Artist().unwrap_or_default().to_string_lossy(),
             has_session: true,
+            is_playing: session.GetPlaybackInfo().and_then(|info| info.PlaybackStatus()).is_ok_and(|status| status == PlaybackStatus::Playing),
         },
         Err(error) => {
             eprintln!("[dumm] properti media gagal dibaca: {error}");
@@ -134,8 +170,8 @@ fn debug_log(update: MediaUpdate) -> MediaUpdate {
             .map(|d| d.as_millis())
             .unwrap_or_default();
         eprintln!(
-            "[dumm] media epoch_ms={ms} has_session={} title=\"{}\" artist=\"{}\"",
-            update.has_session, update.title, update.artist
+            "[dumm] media epoch_ms={ms} has_session={} title=\"{}\" artist=\"{}\" is_playing={}",
+            update.has_session, update.title, update.artist, update.is_playing
         );
     }
     update

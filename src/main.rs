@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Pesan dari thread layanan masuk ke UI hanya lewat event loop Slint.
     let ui = main_window.as_weak();
-    services::media::spawn(move |update| {
+    let commands = services::media::spawn(move |update| {
         let forwarded = ui.upgrade_in_event_loop(move |main_window| {
             let (title, artist) = if update.has_session {
                 (update.title, update.artist)
@@ -42,10 +42,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             main_window.set_media_title(title.into());
             main_window.set_media_artist(artist.into());
+            main_window.set_is_playing(update.is_playing);
         });
         if let Err(error) = forwarded {
             eprintln!("[dumm] pembaruan media tidak terkirim ke UI: {error}");
         }
+    });
+
+    let tx = commands.clone();
+    main_window.on_play_pause(move || {
+        #[cfg(debug_assertions)]
+        eprintln!("[dumm] klik play-pause");
+        let _ = tx.send(services::media::Signal::Command(services::ServiceCommand::TogglePlayPause));
+    });
+    let tx = commands.clone();
+    main_window.on_next(move || {
+        #[cfg(debug_assertions)]
+        eprintln!("[dumm] klik next");
+        let _ = tx.send(services::media::Signal::Command(services::ServiceCommand::Next));
+    });
+    main_window.on_previous(move || {
+        #[cfg(debug_assertions)]
+        eprintln!("[dumm] klik previous");
+        let _ = commands.send(services::media::Signal::Command(services::ServiceCommand::Previous));
     });
 
     slint::run_event_loop()?;

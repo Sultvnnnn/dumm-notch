@@ -109,6 +109,27 @@ Tiga temuan dari pengujian klik nyata, semuanya memengaruhi desain:
    tidak diteruskan. Pengujian harus mengirim `WM_LBUTTONDOWN`/`WM_LBUTTONUP` lewat
    `PostMessage` ke HWND `DummNotchOverlay`, dengan koordinat klien. Ini hanya berlaku untuk
    harness, bukan untuk pengguna: klik mouse fisik tetap bekerja normal.
+4. **Warna desktop bisa menyamarkan tepi pill.** Pill berwarna `#09090b`; bila jendela di
+   belakangnya kebetulan sewarna, diff piksel pada baris itu nol dan lebar pill terbaca salah
+   (pernah 306 px untuk pill 380 px, lalu 363 px pada percobaan berikutnya). Karena itu harness
+   memasang latar putih layar penuh di belakang overlay selama pengukuran, lalu menutupnya.
+   Tanpa itu, kriteria lebar berbasis piksel tidak dapat dipercaya.
+
+### 3.3 Ikon
+
+Ikon transport memakai Phosphor (`fill`, 20×20) sebagai SVG di `assets/icons/`. Alternatif yang
+sudah diuji dan ditolak:
+
+- **Glyph Unicode** (`⏮ ⏯ ⏭`): bobot garis tidak konsisten antar glyph, ukurannya mengikuti
+  metrik teks, dan sebagian sistem merendernya sebagai emoji berwarna.
+- **Geometri Phosphor ditempel ke `Path` Slint**: tidak menambah ukuran biner, tetapi render
+  Slint terhadap busur (`a` command) pada `viewbox 256 → 20 px` menghasilkan bentuk cacat
+  (segitiga mengecil, bar menipis, ikon terpotong).
+
+SVG dirasterisasi saat build lewat `resvg` yang sudah menjadi build-dependency `slint-build`,
+jadi tidak ada dependensi runtime baru. Biayanya nyata: **~0,7 MB untuk empat ikon** pada biner
+release, karena Slint menyimpan hasil raster resolusi tinggi. Warna dibakar ke berkas SVG karena
+gambar Slint tidak punya tint runtime.
 
 ---
 

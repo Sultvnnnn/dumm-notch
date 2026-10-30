@@ -66,6 +66,18 @@ function Move-To([int]$tx, [int]$ty) {
     }
 }
 
+# Latar putih terkontrol: bila warna desktop sama dengan pill (#09090b), tepi pill tidak
+# terukur dari diff dan lebar terbaca salah.
+$backdrop = New-Object System.Windows.Forms.Form
+$backdrop.FormBorderStyle = 'None'
+$backdrop.WindowState = 'Maximized'
+$backdrop.BackColor = [System.Drawing.Color]::White
+$backdrop.ShowInTaskbar = $false
+$backdrop.TopMost = $false
+$backdrop.Show()
+$backdrop.SendToBack()
+Start-Sleep -Milliseconds 500
+
 # Baseline harus diambil tanpa window Dumm di layar.
 Get-Process dum-notch -ErrorAction SilentlyContinue | ForEach-Object { $_.Kill() }
 Start-Sleep -Milliseconds 500
@@ -99,5 +111,7 @@ for ($i = 1; $i -le $Cycles; $i++) {
 Move-To 5 1000
 Start-Sleep -Milliseconds 800
 $p.Kill()
+$backdrop.Close()
+$backdrop.Dispose()
 $baseline.Dispose()
 "HASIL: {0}/{1} siklus lulus" -f $lulus, $Cycles

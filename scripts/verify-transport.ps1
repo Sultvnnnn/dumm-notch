@@ -14,6 +14,9 @@ param(
     [string]$Exe = "D:\codingan\dumm-notch\target\release\dum-notch.exe",
     [int]$Cycles = 10,
     [string]$ExpectedTitle = "Dumm Test Tone",
+    # Bila diisi, identitas target memakai SourceAppUserModelId (lebih stabil daripada judul
+    # karena trek bisa berganti). Contoh: -TargetApp Spotify.exe
+    [string]$TargetApp = "",
     [int]$ToneSeconds = 120,
     [int]$PrevX = 182,
     [int]$PlayX = 210,
@@ -59,8 +62,15 @@ function Get-CurrentMedia {
     $props = Await-Op ($s.TryGetMediaPropertiesAsync()) $PropsType
     return [pscustomobject]@{
         Title  = $(if ($props) { $props.Title } else { "" })
+        AppId  = $s.SourceAppUserModelId
         Status = [int]$s.GetPlaybackInfo().PlaybackStatus
     }
+}
+
+function Test-Target($m) {
+    if (-not $m) { return $false }
+    if ($TargetApp -ne "") { return ($m.AppId -like "*$TargetApp*") }
+    return ($m.Title -eq $targetTitle)
 }
 
 function Move-To([int]$tx, [int]$ty) {
@@ -81,16 +91,25 @@ function Capture-Strip {
     return $bmp
 }
 
+# Lebar pill = bentang diff terbesar di beberapa baris. Satu baris saja tidak cukup: kalau
+# warna desktop di belakang kebetulan mirip #09090b, diff di baris itu mengecil dan lebar
+# terbaca salah (pernah terbaca 306 px untuk pill 380 px).
 function Measure-DiffWidth($baseline, $frame) {
-    $min = -1; $max = -1
-    for ($x = 0; $x -lt $StripW; $x++) {
-        $a = $baseline.GetPixel($x, $ScanRow)
-        $b = $frame.GetPixel($x, $ScanRow)
-        $d = [math]::Abs($a.R - $b.R) + [math]::Abs($a.G - $b.G) + [math]::Abs($a.B - $b.B)
-        if ($d -gt 24) { if ($min -lt 0) { $min = $x }; $max = $x }
+    $best = 0
+    foreach ($row in 4, 12, 20, 28, 36, 44, 52, 60, 68, 76) {
+        $min = -1; $max = -1
+        for ($x = 0; $x -lt $StripW; $x++) {
+            $a = $baseline.GetPixel($x, $row)
+            $b = $frame.GetPixel($x, $row)
+            $d = [math]::Abs($a.R - $b.R) + [math]::Abs($a.G - $b.G) + [math]::Abs($a.B - $b.B)
+            if ($d -gt 24) { if ($min -lt 0) { $min = $x }; $max = $x }
+        }
+        if ($min -ge 0) {
+            $w = $max - $min + 1
+            if ($w -gt $best) { $best = $w }
+        }
     }
-    if ($min -lt 0) { return 0 }
-    return ($max - $min + 1)
+    return $best
 }
 
 function Click-Client([IntPtr]$hwnd, [int]$cx, [int]$cy) {
@@ -103,6 +122,18 @@ function Click-Client([IntPtr]$hwnd, [int]$cx, [int]$cy) {
 }
 
 if (-not (Test-Path $Exe)) { "EXE_TIDAK_ADA: $Exe"; exit 2 }
+
+# Latar putih terkontrol: kalau warna desktop kebetulan sama dengan pill (#09090b), tepi pill
+# tidak bisa diukur dari diff dan lebar terbaca salah (pernah 306 px untuk pill 380 px).
+$backdrop = New-Object System.Windows.Forms.Form
+$backdrop.FormBorderStyle = 'None'
+$backdrop.WindowState = 'Maximized'
+$backdrop.BackColor = [System.Drawing.Color]::White
+$backdrop.ShowInTaskbar = $false
+$backdrop.TopMost = $false
+$backdrop.Show()
+$backdrop.SendToBack()
+Start-Sleep -Milliseconds 500
 
 Get-Process dum-notch -ErrorAction SilentlyContinue | ForEach-Object { $_.Kill() }
 Start-Sleep -Milliseconds 400
@@ -119,7 +150,9 @@ $targetTitle = $null
 for ($i = 0; $i -lt 40; $i++) {
     Start-Sleep -Milliseconds 250
     $m = Get-CurrentMedia
-    if ($m -and $m.Title -eq $ExpectedTitle) { $targetTitle = $ExpectedTitle; break }
+    if ($TargetApp -ne "") {
+        if (Test-Target $m) { $targetTitle = if ($m.Title) { $m.Title } else { $TargetApp }; break }
+    } elseif ($m -and $m.Title -eq $ExpectedTitle) { $targetTitle = $ExpectedTitle; break }
 }
 
 if (-not $targetTitle) {
@@ -127,15 +160,16 @@ if (-not $targetTitle) {
     if (-not $m) {
         "SKIP: tidak ada sesi media aktif"
         if (-not $tone.HasExited) { $tone.Kill() }
+        $backdrop.Close(); $backdrop.Dispose()
         $baseline.Dispose(); exit 0
     }
     # Windows mempertahankan sesi lama sebagai "current" meski tone sedang berbunyi.
     $targetTitle = $m.Title
-    "CATATAN: sesi tone bukan sesi aktif; target alternatif='{0}'" -f $m.Title
+    "CATATAN: sesi tone bukan sesi aktif; target alternatif='{0}' app='{1}'" -f $m.Title, $m.AppId
     if (-not $tone.HasExited) { $tone.Kill() }
     Start-Sleep -Milliseconds 400
 }
-"target_uji='{0}'" -f $targetTitle
+"target_uji='{0}' mode='{1}'" -f $targetTitle, $(if ($TargetApp -ne "") { "app:$TargetApp" } else { "judul" })
 
 $err = "$env:TEMP\dumm-transport.err"
 if (Test-Path $err) { Remove-Item $err }
@@ -159,8 +193,8 @@ $lulus = 0
 $skipIdentitas = 0
 for ($i = 1; $i -le $Cycles; $i++) {
     $m = Get-CurrentMedia
-    if (-not $m -or $m.Title -ne $targetTitle) {
-        "iterasi {0}: SKIP, sesi aktif berubah ('{1}')" -f $i, $(if ($m) { $m.Title } else { "(tidak ada)" })
+    if (-not (Test-Target $m)) {
+        "iterasi {0}: SKIP, target berubah ('{1}')" -f $i, $(if ($m) { $m.Title } else { "(tidak ada)" })
         $skipIdentitas++
         continue
     }
@@ -218,6 +252,8 @@ $hidup = -not $p.HasExited
 $p.Kill()
 if (-not $tone.HasExited) { $tone.Kill() }
 $baseline.Dispose()
+$backdrop.Close()
+$backdrop.Dispose()
 $errBytes = if (Test-Path $err) { (Get-Item $err).Length } else { -1 }
 "proses_hidup_selama_uji={0} stderr_bytes={1}" -f $hidup, $errBytes
 "HASIL: {0}/{1} iterasi lulus" -f $lulus, $Cycles

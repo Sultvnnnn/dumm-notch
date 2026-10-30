@@ -80,23 +80,24 @@ export component MainWindow inherits Window {
 
             if root.is_expanded: HorizontalLayout {
                 alignment: center;
-                spacing: 0px;
+                spacing: 8px;
 
+                // Ikon Phosphor (MIT), bobot fill, 20 px. spacing 8 px membuat jarak
+                // antar-pusat ikon tepat 28 px, sama dengan zona klik di TouchArea pill.
                 // Ikon hanya tampilan; yang menangkap klik adalah TouchArea di atas.
-                Text {
-                    width: 28px; height: 28px;
-                    text: "⏮"; color: #f4f4f5;
-                    horizontal-alignment: center; vertical-alignment: center;
+                Image {
+                    width: 20px; height: 20px;
+                    source: @image-url("../assets/icons/skip-back.svg");
                 }
-                Text {
-                    width: 28px; height: 28px;
-                    text: root.is-playing ? "⏸" : "⏯"; color: #f4f4f5;
-                    horizontal-alignment: center; vertical-alignment: center;
+                Image {
+                    width: 20px; height: 20px;
+                    source: root.is-playing
+                        ? @image-url("../assets/icons/pause.svg")
+                        : @image-url("../assets/icons/play.svg");
                 }
-                Text {
-                    width: 28px; height: 28px;
-                    text: "⏭"; color: #f4f4f5;
-                    horizontal-alignment: center; vertical-alignment: center;
+                Image {
+                    width: 20px; height: 20px;
+                    source: @image-url("../assets/icons/skip-forward.svg");
                 }
             }
         }

@@ -83,6 +83,7 @@ src/window/position.rs   center horizontally, pin to y = 0, keep topmost
 src/services/media.rs    GSMTC session service thread: title/artist, event-driven, no polling
 src/services/mod.rs      message types shared with the UI (no Slint types)
 ui/notch.slint           declarative UI: pill, expansion animation, hover state
+assets/icons/            Phosphor fill icons (MIT), colour baked into the SVG
 scripts/verify-*.ps1     DoD harnesses (hover geometry, idle CPU)
 docs/PRD.md              product requirements
 docs/ARCHITECTURE.md     data flow, zero-polling policy, memory analysis, decision log
@@ -102,6 +103,12 @@ no FFI, no logic beyond view state.
 - `DwmExtendFrameIntoClientArea` is deliberately **not** used: it produced a 1 px gray border
   and an "×" glyph on this stack. Transparency comes from the software renderer instead.
 - No installer, no autostart entry, no tray icon yet.
+
+## Credits
+
+Transport icons are [Phosphor Icons](https://phosphoricons.com/) (MIT), `fill` weight, 20×20.
+Only four glyphs are vendored in `assets/icons/`, with the fill colour baked to `#f4f4f5`
+because Slint images carry no runtime tint.
 
 ## Documentation
 

@@ -320,8 +320,14 @@ fn decode_artwork(props: &windows::Media::Control::GlobalSystemMediaTransportCon
                             converter.Initialize(&frame, &GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, None, 0.0, WICBitmapPaletteTypeCustom)?;
                             let scaler = factory.CreateBitmapScaler()?;
                             scaler.Initialize(&converter, 40, 40, WICBitmapInterpolationModeFant)?;
+                            // Scaler tidak menjamin format keluaran: di pipeline ini ia
+                            // mengembalikan BGRA (terukur lewat artwork kontrol, R dan B
+                            // tertukar). Konversi sekali lagi tepat sebelum CopyPixels supaya
+                            // byte yang dibaca benar-benar RGBA.
+                            let out = factory.CreateFormatConverter()?;
+                            out.Initialize(&scaler, &GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, None, 0.0, WICBitmapPaletteTypeCustom)?;
                             let mut rgba = vec![0; 40 * 40 * 4];
-                            scaler.CopyPixels(std::ptr::null(), 160, &mut rgba)?;
+                            out.CopyPixels(std::ptr::null(), 160, &mut rgba)?;
                             Ok(Artwork { width: 40, height: 40, rgba })
                         }
                     })();

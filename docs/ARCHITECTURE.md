@@ -143,6 +143,14 @@ sudah benar. Aturannya:
 - "Belum tersedia" (null atau ukuran 0) dicoba ulang maksimal 3 × 200 ms, sekali per trek.
 - Gagal saat trek sama → pertahankan artwork terakhir; gagal saat trek berubah → kosongkan.
 
+**Format piksel WIC tidak boleh diasumsikan.** `IWICBitmapScaler` tidak menjamin format keluaran:
+walaupun sumbernya `IWICFormatConverter` yang diminta `GUID_WICPixelFormat32bppRGBA`, hasil
+`CopyPixels` dari scaler bisa tetap BGRA — akibatnya merah dan biru tertukar di layar, dan
+pemeriksaan "ada gambar" tetap lulus karena gambarnya memang ada. Urutan yang benar: decode →
+konversi ke RGBA → scale → **konversi sekali lagi ke RGBA tepat sebelum `CopyPixels`**. Uji
+regresinya `scripts/verify-artwork-color.ps1`, yang memutar artwork kontrol empat kuadran
+(merah, hijau, biru, putih) dan membandingkan nilai piksel di kartu; selisih 0 berarti kanal benar.
+
 **HUD volume.** `IAudioEndpointVolume` + `RegisterControlChangeNotify` di thread sendiri,
 callback hanya mengirim pesan; UI mengubah bar. Dua jebakan:
 

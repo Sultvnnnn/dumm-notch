@@ -61,6 +61,7 @@ real screen, so no claim rests on eyeballing:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify-hover.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify-idle.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify-artwork-color.ps1
 ```
 
 - `verify-hover.ps1` moves the cursor in interpolated steps (a teleporting `SetCursorPos` does

@@ -91,19 +91,20 @@ function Capture-Strip {
     return $bmp
 }
 
-# Lebar pill = panjang run diff yang memuat titik tengah layar (x=960). Run lain di luar pill
-# diabaikan, karena jendela lain di belakang bisa berubah dan memperlebar bentang diff
-# (pernah terbaca 550 px untuk pill 380 px).
+# Lebar pill = panjang run diff gelap yang memuat titik tengah layar (x=960). Syarat "gelap"
+# penting: jendela lain di belakang pill bisa ikut berubah (video yang diputar) sehingga run
+# diff merembet keluar pill dan lebar terbaca 550 px untuk pill 380 px.
 function Measure-DiffWidth($baseline, $frame) {
     $center = 960 - $StripX
     $best = 0
-    foreach ($row in 4, 12, 20, 28, 36, 44, 52, 60, 68, 76) {
+    foreach ($row in 3, 5, 80, 84, 86) {
         $diff = New-Object 'bool[]' $StripW
         for ($x = 0; $x -lt $StripW; $x++) {
             $a = $baseline.GetPixel($x, $row)
             $b = $frame.GetPixel($x, $row)
             $d = [math]::Abs($a.R - $b.R) + [math]::Abs($a.G - $b.G) + [math]::Abs($a.B - $b.B)
-            $diff[$x] = ($d -gt 24)
+            $gelap = ($b.R -lt 40 -and $b.G -lt 40 -and $b.B -lt 40)
+            $diff[$x] = ($d -gt 24 -and $gelap)
         }
         if (-not $diff[$center]) { continue }
         $l = $center; $r = $center
@@ -122,6 +123,58 @@ function Click-Client([IntPtr]$hwnd, [int]$cx, [int]$cy) {
     [TransportCtl]::PostMessageW($hwnd, 0x0201, [IntPtr]1, $lp) | Out-Null
     Start-Sleep -Milliseconds 40
     [TransportCtl]::PostMessageW($hwnd, 0x0202, [IntPtr]0, $lp) | Out-Null
+}
+
+# Deteksi baris tombol dari piksel. Klaster dihitung dari kolom yang punya piksel terang di
+# pita bawah pill (y 55..90), bukan dari satu baris: satu baris bisa jatuh di bagian ikon yang
+# kosong sehingga jumlah klaster kurang dari tiga. Jendela x dibatasi ke tengah pill (900..1020)
+# supaya artwork yang juga terang tidak ikut terhitung.
+function Find-Buttons($frame) {
+    $x0 = 900 - $StripX; $x1 = 1020 - $StripX
+    $y0 = 55; $y1 = 90
+    $clusters = @()
+    $start = -1
+    for ($x = $x0; $x -lt $x1; $x++) {
+        $lit = $false
+        for ($y = $y0; $y -lt $y1; $y++) {
+            $c = $frame.GetPixel($x, $y)
+            if ($c.R -gt 150 -and $c.G -gt 150 -and $c.B -gt 150) { $lit = $true; break }
+        }
+        if ($lit -and $start -lt 0) { $start = $x }
+        elseif (-not $lit -and $start -ge 0) {
+            $clusters += [pscustomobject]@{ Awal = $start; Akhir = $x - 1 }
+            $start = -1
+        }
+    }
+    if ($start -ge 0) { $clusters += [pscustomobject]@{ Awal = $start; Akhir = $x1 - 1 } }
+    if ($clusters.Count -lt 3) { return $null }
+
+    $merged = @()
+    foreach ($c in $clusters) {
+        if ($merged.Count -gt 0 -and ($c.Awal - $merged[-1].Akhir) -lt 4) { $merged[-1].Akhir = $c.Akhir }
+        else { $merged += [pscustomobject]@{ Awal = $c.Awal; Akhir = $c.Akhir } }
+    }
+    if ($merged.Count -lt 3) { return $null }
+
+    $centers = @($merged | ForEach-Object { [int](($_.Awal + $_.Akhir) / 2) })
+    $mid = [int][math]::Floor($centers.Count / 2)
+
+    $sumY = 0.0; $nY = 0
+    for ($x = $merged[$mid].Awal; $x -le $merged[$mid].Akhir; $x++) {
+        for ($y = $y0; $y -lt $y1; $y++) {
+            $c = $frame.GetPixel($x, $y)
+            if ($c.R -gt 150 -and $c.G -gt 150 -and $c.B -gt 150) { $sumY += $y; $nY++ }
+        }
+    }
+    $rowY = if ($nY -gt 0) { [int]($sumY / $nY) } else { $RowY }
+
+    return [pscustomobject]@{
+        PrevX  = $centers[$mid - 1] + $StripX - 750
+        PlayX  = $centers[$mid] + $StripX - 750
+        NextX  = $centers[$mid + 1] + $StripX - 750
+        RowY   = $rowY
+        Jumlah = $merged.Count
+    }
 }
 
 if (-not (Test-Path $Exe)) { "EXE_TIDAK_ADA: $Exe"; exit 2 }
@@ -190,6 +243,17 @@ $f = Capture-Strip
 $wExpanded = Measure-DiffWidth $baseline $f
 $f.Dispose()
 "lebar_expanded={0}px (harapan 380)" -f $wExpanded
+
+# Deteksi posisi tombol dari kartu yang sedang terbuka; tata letak kartu bisa berubah.
+$fDeteksi = Capture-Strip
+$tombol = Find-Buttons $fDeteksi
+$fDeteksi.Dispose()
+if ($null -ne $tombol) {
+    $PrevX = $tombol.PrevX; $PlayX = $tombol.PlayX; $NextX = $tombol.NextX; $RowY = $tombol.RowY
+    "tombol_terdeteksi={0} prev_x={1} play_x={2} next_x={3} row_y={4}" -f $tombol.Jumlah, $PrevX, $PlayX, $NextX, $RowY
+} else {
+    "tombol_terdeteksi=0 (memakai koordinat parameter: {0}/{1}/{2} y={3})" -f $PrevX, $PlayX, $NextX, $RowY
+}
 
 $statusAwal = (Get-CurrentMedia).Status
 $lulus = 0

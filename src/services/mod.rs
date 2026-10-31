@@ -34,4 +34,9 @@ pub struct MediaUpdate {
     pub is_playing: bool,
     pub artwork: Option<Artwork>,
     pub artwork_changed: bool,
+    /// Fraksi posisi pemutaran 0.0..1.0 dari timeline GSMTC (terakhir dibaca).
+    pub position_frac: f32,
+    /// Label "mm:ss" untuk posisi dan durasi; kosong bila timeline tidak tersedia.
+    pub position_label: String,
+    pub duration_label: String,
 }

@@ -43,6 +43,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             main_window.set_media_title(title.into());
             main_window.set_media_artist(artist.into());
             main_window.set_is_playing(update.is_playing);
+            main_window.set_position_frac(update.position_frac);
+            main_window.set_position_label(update.position_label.into());
+            main_window.set_duration_label(update.duration_label.into());
             if update.artwork_changed {
                 let artwork = update.artwork.map(|art| {
                     let pixels = slint::SharedPixelBuffer::<slint::Rgba8Pixel>::clone_from_slice(&art.rgba, art.width, art.height);

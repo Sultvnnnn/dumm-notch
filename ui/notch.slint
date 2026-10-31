@@ -13,6 +13,10 @@ export component MainWindow inherits Window {
     in property <string> media-artist;
     in property <bool> is-playing;
     in property <image> media-artwork;
+    // Timeline dari GSMTC, diambil saat event (bukan timer).
+    in property <float> position-frac: 0.0;
+    in property <string> position-label;
+    in property <string> duration-label;
     in property <float> volume-level: 0.0;
     in property <bool> volume-muted: false;
     // V2: false sampai main.rs menyelesaikan pembaruan volume pertama (baseline). Selama
@@ -62,12 +66,12 @@ export component MainWindow inherits Window {
 
             clicked => {
                 if (root.is_expanded) {
-                    // Baris tombol: 28 px di bagian bawah pill, tiga tombol berdampingan
-                    // dengan pusat di width/2 - 28, width/2, dan width/2 + 28.
-                    if (self.mouse-y >= self.height - 44px && self.mouse-y <= self.height - 16px) {
-                        if (self.mouse-x < self.width / 2 - 14px) {
+                    // Baris tombol berada 4-26 px dari tepi bawah pill, dengan pusat
+                    // di width/2 - 26, width/2, width/2 + 26 (spacing 8 px + ikon 18 px).
+                    if (self.mouse-y >= self.height - 26px && self.mouse-y <= self.height - 4px) {
+                        if (self.mouse-x < self.width / 2 - 13px) {
                             root.previous();
-                        } else if (self.mouse-x > self.width / 2 + 14px) {
+                        } else if (self.mouse-x > self.width / 2 + 13px) {
                             root.next();
                         } else {
                             root.play-pause();
@@ -79,58 +83,105 @@ export component MainWindow inherits Window {
 
         VerticalLayout {
             padding: 6px;
-            spacing: 0px;
+            spacing: 1px;
             alignment: center;
 
             if !root.is_expanded: Text {
-                text: !root.is_expanded ? "Dumm"
-                    : root.media-title != "" ? root.media-title
-                    : "Dumm Active - Media & HUD Hub";
+                text: "Dumm";
                 color: #f4f4f5;
-                font-size: root.is_expanded ? 14px : 12px;
+                font-size: 12px;
                 overflow: elide;
                 horizontal-alignment: center;
             }
 
+            // Baris 1: artwork di kiri, judul + artis rata kiri di kanannya.
             if root.is_expanded: HorizontalLayout {
                 spacing: 8px;
+                alignment: start;
+
                 Rectangle {
-                    width: 40px; height: 40px;
-                    border-radius: 6px;
+                    width: 42px; height: 42px;
+                    border-radius: 8px;
                     background: #18181b;
                     clip: true;
                     Image { source: root.media-artwork; image-fit: cover; }
                 }
+
                 VerticalLayout {
                     alignment: center;
-                    Text { text: root.media-title != "" ? root.media-title : "Dumm"; color: #f4f4f5; font-size: 14px; overflow: elide; }
-                    Text { text: root.media-artist; color: #f4f4f5; font-size: 12px; overflow: elide; }
+                    spacing: 0px;
+                    Text {
+                        text: root.media-title != "" ? root.media-title : "Dumm Active";
+                        color: #f4f4f5;
+                        font-size: 13px;
+                        overflow: elide;
+                        horizontal-alignment: left;
+                    }
+                    Text {
+                        text: root.media-artist != "" ? root.media-artist : "Media & HUD Hub";
+                        color: #a1a1aa;
+                        font-size: 11px;
+                        overflow: elide;
+                        horizontal-alignment: left;
+                    }
                 }
             }
 
+            // Baris 2: progress bar tipis.
+            if root.is_expanded: Rectangle {
+                height: 3px;
+                border-radius: 2px;
+                background: #27272a;
+                Rectangle {
+                    width: parent.width * Math.max(0.0, Math.min(1.0, root.position-frac));
+                    height: parent.height;
+                    border-radius: 2px;
+                    background: #f4f4f5;
+                }
+            }
+
+            // Baris 3: waktu berjalan (kiri) dan durasi (kanan). Tersembunyi bila timeline kosong.
+            if root.is_expanded && root.duration-label != "": Rectangle {
+                height: 10px;
+                Text {
+                    x: 0px;
+                    text: root.position-label;
+                    color: #a1a1aa;
+                    font-size: 9px;
+                    horizontal-alignment: left;
+                }
+                Text {
+                    x: parent.width - 44px;
+                    width: 44px;
+                    text: root.duration-label;
+                    color: #a1a1aa;
+                    font-size: 9px;
+                    horizontal-alignment: right;
+                }
+            }
+
+            // Baris 4: kontrol transport, di tengah.
             if root.is_expanded: HorizontalLayout {
                 alignment: center;
                 spacing: 8px;
 
-                // Ikon Phosphor (MIT), bobot fill, 20 px. spacing 8 px membuat jarak
-                // antar-pusat ikon tepat 28 px, sama dengan zona klik di TouchArea pill.
-                // Ikon hanya tampilan; yang menangkap klik adalah TouchArea di atas.
+                // Ikon Phosphor (MIT), bobot fill. Ikon hanya tampilan; yang menangkap klik
+                // adalah TouchArea di atas.
                 Image {
-                    width: 20px; height: 20px;
+                    width: 18px; height: 18px;
                     source: @image-url("../assets/icons/skip-back.svg");
                 }
                 Image {
-                    width: 20px; height: 20px;
+                    width: 18px; height: 18px;
                     source: root.is-playing
                         ? @image-url("../assets/icons/pause.svg")
                         : @image-url("../assets/icons/play.svg");
                 }
                 Image {
-                    width: 20px; height: 20px;
+                    width: 18px; height: 18px;
                     source: @image-url("../assets/icons/skip-forward.svg");
                 }
             }
-
         }
     }
 

@@ -139,6 +139,13 @@ $noBlink = ($blinkBright -lt 20)
 Move-To 960 16
 Start-Sleep -Milliseconds 900
 
+# Turunkan volume dulu 5 langkah: kalau endpoint sudah di 100%, VK_VOLUME_UP tidak mengubah
+# apa pun sehingga tidak ada callback dan HUD tidak muncul (itu perilaku benar, bukan bug).
+for ($n = 0; $n -lt 5; $n++) { Send-VolKey $VK_VOLUME_DOWN; Start-Sleep -Milliseconds 80 }
+# Tunggu HUD dari penurunan volume benar-benar hilang (timer 1500 ms) sebelum baseline diambil,
+# kalau tidak baseline sudah memuat HUD dan pengukuran "muncul" jadi salah.
+Start-Sleep -Milliseconds 2200
+
 $baseline = Capture-Region $BandX $BandY $BandW $BandH
 
 $lulus = 0

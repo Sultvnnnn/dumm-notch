@@ -178,6 +178,7 @@ fn snapshot(watched: Option<&(Session, EventRegistrationToken, EventRegistration
             let is_playing = session.GetPlaybackInfo()
                 .and_then(|info| info.PlaybackStatus())
                 .is_ok_and(|status| status == PlaybackStatus::Playing);
+            let (position_frac, position_label, duration_label) = timeline_meta(session);
 
             // F1: decode hanya bila key berubah atau artwork belum pernah ada / belum
             // disimpulkan untuk trek ini. Event lain (PlaybackChanged, penolakan perintah,
@@ -218,6 +219,9 @@ fn snapshot(watched: Option<&(Session, EventRegistrationToken, EventRegistration
                 is_playing,
                 artwork,
                 artwork_changed,
+                position_frac,
+                position_label,
+                duration_label,
             }
         }
         Err(error) => {
@@ -340,6 +344,39 @@ fn decode_artwork(props: &windows::Media::Control::GlobalSystemMediaTransportCon
             }
         }
         Err(error) => classify_artwork_error(&error),
+    }
+}
+
+/// Membaca timeline GSMTC: fraksi posisi dan label waktu. Nilai ini diambil saat snapshot
+/// (event), bukan lewat timer; tanpa timeline, semua nilai kosong dan bar tidak tampil.
+fn timeline_meta(session: &Session) -> (f32, String, String) {
+    let Ok(info) = session.GetTimelineProperties() else {
+        return (0.0, String::new(), String::new());
+    };
+    let to_sec = |span: windows::Foundation::TimeSpan| span.Duration as f64 / 10_000_000.0;
+    let pos = info.Position().map(to_sec).unwrap_or(0.0);
+    let start = info.StartTime().map(to_sec).unwrap_or(0.0);
+    let end = info.EndTime().map(to_sec).unwrap_or(0.0);
+    let dur = (end - start).max(0.0);
+    let frac = if dur > 0.0 {
+        (((pos - start) / dur).clamp(0.0, 1.0)) as f32
+    } else {
+        0.0
+    };
+    (frac, format_clock(pos), format_clock(dur))
+}
+
+/// "mm:ss", atau "h:mm:ss" untuk trek lebih dari satu jam.
+fn format_clock(seconds: f64) -> String {
+    if !seconds.is_finite() || seconds < 0.0 {
+        return String::new();
+    }
+    let total = seconds.round() as u64;
+    let (h, m, s) = (total / 3600, (total % 3600) / 60, total % 60);
+    if h > 0 {
+        format!("{h}:{m:02}:{s:02}")
+    } else {
+        format!("{m}:{s:02}")
     }
 }
 

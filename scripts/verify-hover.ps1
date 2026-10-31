@@ -38,19 +38,20 @@ function Capture-Strip {
     return $bmp
 }
 
-# Lebar pill = panjang run diff yang memuat titik tengah layar (x=960). Run lain di luar pill
-# diabaikan, karena jendela lain di belakang bisa berubah dan memperlebar bentang diff
-# (pernah terbaca 550 px untuk pill 380 px).
+# Lebar pill = panjang run diff gelap yang memuat titik tengah layar (x=960). Syarat "gelap"
+# penting: jendela lain di belakang pill bisa ikut berubah (video yang diputar) sehingga run
+# diff merembet keluar pill dan lebar terbaca 550 px untuk pill 380 px.
 function Measure-DiffWidth($baseline, $frame) {
     $center = 960 - $StripX
     $best = 0
-    foreach ($row in 4, 12, 20, 28, 36, 44, 52, 60, 68, 76) {
+    foreach ($row in 3, 5, 80, 84, 86) {
         $diff = New-Object 'bool[]' $StripW
         for ($x = 0; $x -lt $StripW; $x++) {
             $a = $baseline.GetPixel($x, $row)
             $b = $frame.GetPixel($x, $row)
             $d = [math]::Abs($a.R - $b.R) + [math]::Abs($a.G - $b.G) + [math]::Abs($a.B - $b.B)
-            $diff[$x] = ($d -gt 24)
+            $gelap = ($b.R -lt 40 -and $b.G -lt 40 -and $b.B -lt 40)
+            $diff[$x] = ($d -gt 24 -and $gelap)
         }
         if (-not $diff[$center]) { continue }
         $l = $center; $r = $center

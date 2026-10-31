@@ -151,6 +151,13 @@ konversi ke RGBA → scale → **konversi sekali lagi ke RGBA tepat sebelum `Cop
 regresinya `scripts/verify-artwork-color.ps1`, yang memutar artwork kontrol empat kuadran
 (merah, hijau, biru, putih) dan membandingkan nilai piksel di kartu; selisih 0 berarti kanal benar.
 
+**Timeline dan progress bar.** Posisi dan durasi dibaca dari `GetTimelineProperties()` saat
+snapshot event, jadi bar mencerminkan posisi terakhir yang dilaporkan pemutar, bukan animasi
+mulus. Ini keputusan sadar: animasi posisi memerlukan timer 1 Hz di thread UI, dan itu
+melanggar kebijakan zero-polling sekaligus menaikkan CPU idle saat kartu terbuka. Kalau nanti
+diinginkan bar yang bergerak, bentuk yang benar adalah `TimelinePropertiesChanged` sebagai
+pemicu utama, dengan animasi 250 ms antar-nilai supaya tidak melompat — bukan timer.
+
 **HUD volume.** `IAudioEndpointVolume` + `RegisterControlChangeNotify` di thread sendiri,
 callback hanya mengirim pesan; UI mengubah bar. Dua jebakan:
 

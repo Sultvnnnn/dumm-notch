@@ -43,9 +43,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             main_window.set_media_title(title.into());
             main_window.set_media_artist(artist.into());
             main_window.set_is_playing(update.is_playing);
+            if update.artwork_changed {
+                let artwork = update.artwork.map(|art| {
+                    let pixels = slint::SharedPixelBuffer::<slint::Rgba8Pixel>::clone_from_slice(&art.rgba, art.width, art.height);
+                    slint::Image::from_rgba8(pixels)
+                }).unwrap_or_default();
+                main_window.set_media_artwork(artwork);
+            }
         });
         if let Err(error) = forwarded {
             eprintln!("[dumm] pembaruan media tidak terkirim ke UI: {error}");
+        }
+    });
+
+    let ui_volume = main_window.as_weak();
+    // V2: pembaruan volume pertama adalah baseline (nilai awal endpoint) dan tidak boleh
+    // memunculkan HUD. `volume-ready` baru dinaikkan pada pembaruan kedua, sehingga hanya
+    // perubahan volume nyata dari pengguna yang memicu HUD. Tanpa timer.
+    let volume_updates = std::cell::Cell::new(0u32);
+    services::volume::spawn(move |update| {
+        let count = volume_updates.get() + 1;
+        volume_updates.set(count);
+        let forwarded = ui_volume.upgrade_in_event_loop(move |main_window| {
+            let ready = count > 1;
+            main_window.set_volume_level(update.level);
+            main_window.set_volume_muted(update.muted);
+            main_window.set_volume_ready(ready);
+        });
+        if let Err(error) = forwarded {
+            eprintln!("[dumm] pembaruan volume tidak terkirim ke UI: {error}");
         }
     });
 

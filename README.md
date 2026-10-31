@@ -20,10 +20,10 @@ Electron, no Tauri, no WebView2.
 
 ## Status
 
-Phase 1 (native window shell) is complete and verified. Phase 2 is under way: the media slice
-reads the active GSMTC session, shows title and artist in the expanded pill, and drives
-play/pause, next and previous through the same service thread — all event-driven, no polling.
-Artwork, the volume HUD and Phase 3 remain, as specified in `docs/ROADMAP.md`.
+Phase 1 (native window shell) is complete and verified. Phase 2 is largely done: the media card
+shows artwork, title and artist, drives play/pause, next and previous, and a volume HUD appears
+when the system volume changes — all event-driven, no polling. Remaining before Phase 3: window
+sizing (the native window is still 420×160 around a 380×90 card) and multi-monitor centering.
 
 ## Stack
 

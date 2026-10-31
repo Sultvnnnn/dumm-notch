@@ -21,7 +21,18 @@ features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_System_WinRT",
     "Media_Control",
+    "Storage_Streams",
+    "Win32_Graphics_Imaging",
+    "Win32_System_Com",
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
+    "implement",
 ]
+
+# Diperlukan agar makro #[implement] dari windows 0.58 menemukan path ::windows_core.
+# Crate ini sudah ada di graph (dependensi windows sendiri, versi 0.58.0), jadi tidak menambah kode.
+[dependencies.windows-core]
+version = "0.58"
 
 [build-dependencies]
 slint-build = "1.9"

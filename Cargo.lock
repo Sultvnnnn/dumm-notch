@@ -883,6 +883,7 @@ dependencies = [
  "slint",
  "slint-build",
  "windows 0.58.0",
+ "windows-core 0.58.0",
 ]
 
 [[package]]

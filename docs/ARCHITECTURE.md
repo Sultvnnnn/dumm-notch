@@ -131,6 +131,35 @@ jadi tidak ada dependensi runtime baru. Biayanya nyata: **~0,7 MB untuk empat ik
 release, karena Slint menyimpan hasil raster resolusi tinggi. Warna dibakar ke berkas SVG karena
 gambar Slint tidak punya tint runtime.
 
+### 3.4 Artwork dan HUD volume
+
+**Artwork.** `Thumbnail()` bisa mengembalikan null pada saat snapshot, dan `windows` memetakan
+null itu menjadi `Error` dengan HRESULT **0** (`Error::empty()`), bukan `E_POINTER`. Tanpa
+penanganan khusus, kegagalan sesaat itu dianggap "tidak ada artwork" dan menghapus gambar yang
+sudah benar. Aturannya:
+
+- Decode hanya saat identitas trek (judul, artis) berubah; event `PlaybackChanged` atau
+  penolakan perintah tidak memicu decode.
+- "Belum tersedia" (null atau ukuran 0) dicoba ulang maksimal 3 × 200 ms, sekali per trek.
+- Gagal saat trek sama → pertahankan artwork terakhir; gagal saat trek berubah → kosongkan.
+
+**HUD volume.** `IAudioEndpointVolume` + `RegisterControlChangeNotify` di thread sendiri,
+callback hanya mengirim pesan; UI mengubah bar. Dua jebakan:
+
+- Nilai volume pertama dari endpoint adalah **baseline**, bukan perubahan pengguna. Tanpa gate,
+  HUD berkedip 1,5 detik setiap aplikasi start. Solusi: properti `volume-ready` yang baru
+  dinaikkan pada pembaruan kedua.
+- Slint tidak mendukung interpolasi `${...}` pada properti string. Yang benar
+  `"\{Math.round(root.volume-level * 100)}%"`; kalau salah, UI menampilkan teks mentah
+  `$(Math.roi…` dan tetap "lulus" uji diff piksel.
+
+**`#[implement]` dan `windows_core`.** Makro `#[implement]` dari `windows` 0.58 merujuk path
+absolut `::windows_core`, yang tidak ada bila crate itu bukan dependensi langsung. Jangan
+mengakalinya dengan `extern crate self as windows_core` + `pub use windows::core::*` — itu
+mengotori namespace root dan membuat `Result` ambigu. Deklarasikan saja
+`windows-core = "0.58"` sebagai dependensi eksplisit; crate itu sudah ada di dependency graph
+`windows`, jadi tidak menambah kode apa pun pada biner.
+
 ---
 
 ## 4. Struktur Modul

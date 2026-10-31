@@ -38,20 +38,28 @@ function Capture-Strip {
     return $bmp
 }
 
-# Lebar bentang piksel yang berbeda dari baseline pada baris $ScanRow (run terpanjang).
+# Lebar pill = panjang run diff yang memuat titik tengah layar (x=960). Run lain di luar pill
+# diabaikan, karena jendela lain di belakang bisa berubah dan memperlebar bentang diff
+# (pernah terbaca 550 px untuk pill 380 px).
 function Measure-DiffWidth($baseline, $frame) {
-    $min = -1; $max = -1
-    for ($x = 0; $x -lt $StripW; $x++) {
-        $a = $baseline.GetPixel($x, $ScanRow)
-        $b = $frame.GetPixel($x, $ScanRow)
-        $d = [math]::Abs($a.R - $b.R) + [math]::Abs($a.G - $b.G) + [math]::Abs($a.B - $b.B)
-        if ($d -gt 24) {
-            if ($min -lt 0) { $min = $x }
-            $max = $x
+    $center = 960 - $StripX
+    $best = 0
+    foreach ($row in 4, 12, 20, 28, 36, 44, 52, 60, 68, 76) {
+        $diff = New-Object 'bool[]' $StripW
+        for ($x = 0; $x -lt $StripW; $x++) {
+            $a = $baseline.GetPixel($x, $row)
+            $b = $frame.GetPixel($x, $row)
+            $d = [math]::Abs($a.R - $b.R) + [math]::Abs($a.G - $b.G) + [math]::Abs($a.B - $b.B)
+            $diff[$x] = ($d -gt 24)
         }
+        if (-not $diff[$center]) { continue }
+        $l = $center; $r = $center
+        while ($l -gt 0 -and $diff[$l - 1]) { $l-- }
+        while ($r -lt ($StripW - 1) -and $diff[$r + 1]) { $r++ }
+        $w = $r - $l + 1
+        if ($w -gt $best) { $best = $w }
     }
-    if ($min -lt 0) { return 0 }
-    return ($max - $min + 1)
+    return $best
 }
 
 function Move-To([int]$tx, [int]$ty) {

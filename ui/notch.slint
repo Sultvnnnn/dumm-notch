@@ -12,9 +12,31 @@ export component MainWindow inherits Window {
     in property <string> media-title;
     in property <string> media-artist;
     in property <bool> is-playing;
+    in property <image> media-artwork;
+    in property <float> volume-level: 0.0;
+    in property <bool> volume-muted: false;
+    // V2: false sampai main.rs menyelesaikan pembaruan volume pertama (baseline). Selama
+    // false, perubahan volume-level tidak memunculkan HUD sehingga tidak berkedip saat start.
+    in property <bool> volume-ready: false;
+    in-out property <bool> hud-visible: false;
     callback play-pause();
     callback next();
     callback previous();
+
+    // Satu timer sekali-jalan untuk HUD volume. Saat idle `running == false` (tidak ada timer
+    // hidup). Trigger mematikan HUD; karena `running` terikat `hud-visible`, timer ikut mati.
+    hud-timer := Timer {
+        interval: 1500ms;
+        running: root.hud-visible;
+        triggered => { root.hud-visible = false; }
+    }
+
+    changed volume-level => {
+        if (root.volume-ready) { root.hud-visible = true; hud-timer.restart(); }
+    }
+    changed volume-muted => {
+        if (root.volume-ready) { root.hud-visible = true; hud-timer.restart(); }
+    }
 
     pill := Rectangle {
         x: (parent.width - self.width) / 2;
@@ -60,7 +82,7 @@ export component MainWindow inherits Window {
             spacing: 0px;
             alignment: center;
 
-            Text {
+            if !root.is_expanded: Text {
                 text: !root.is_expanded ? "Dumm"
                     : root.media-title != "" ? root.media-title
                     : "Dumm Active - Media & HUD Hub";
@@ -70,12 +92,20 @@ export component MainWindow inherits Window {
                 horizontal-alignment: center;
             }
 
-            if root.is_expanded && root.media-title != "" && root.media-artist != "": Text {
-                text: root.media-artist;
-                color: #f4f4f5;
-                font-size: 12px;
-                overflow: elide;
-                horizontal-alignment: center;
+            if root.is_expanded: HorizontalLayout {
+                spacing: 8px;
+                Rectangle {
+                    width: 40px; height: 40px;
+                    border-radius: 6px;
+                    background: #18181b;
+                    clip: true;
+                    Image { source: root.media-artwork; image-fit: cover; }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Text { text: root.media-title != "" ? root.media-title : "Dumm"; color: #f4f4f5; font-size: 14px; overflow: elide; }
+                    Text { text: root.media-artist; color: #f4f4f5; font-size: 12px; overflow: elide; }
+                }
             }
 
             if root.is_expanded: HorizontalLayout {
@@ -100,6 +130,39 @@ export component MainWindow inherits Window {
                     source: @image-url("../assets/icons/skip-forward.svg");
                 }
             }
+
         }
+    }
+
+    // HUD volume: bar 4 px di bagian bawah pill + angka persen (10 px) di kanan. Anak root
+    // (bukan pill) agar bebas diposisikan; koordinat mengikuti geometri pill sehingga tidak
+    // mengubah tinggi pill dan tidak menggeser baris ikon. Muncul saat expanded maupun collapsed.
+    if root.hud-visible: Rectangle {
+        // V3: margin horizontal 12 px (radius 18 px) agar bar tidak menyentuh tepi
+        // membulat pill sehingga ujung bawah tidak tampak persegi.
+        x: pill.x + 12px;
+        y: pill.y + pill.height - 6px;
+        width: pill.width - 24px;
+        height: 4px;
+        border-radius: 2px;
+        background: #27272a;
+        Rectangle {
+            width: root.volume-muted
+                ? parent.width
+                : parent.width * Math.max(0.0, Math.min(1.0, root.volume-level));
+            height: parent.height;
+            border-radius: 2px;
+            background: root.volume-muted ? #71717a : #f4f4f5;
+        }
+    }
+    if root.hud-visible: Text {
+        x: pill.x + pill.width - 50px;
+        y: pill.y + pill.height - 16px;
+        width: 44px;
+        height: 12px;
+        text: root.volume-muted ? "Muted" : "\{Math.round(root.volume-level * 100)}%";
+        color: #f4f4f5;
+        font-size: 10px;
+        horizontal-alignment: right;
     }
 }

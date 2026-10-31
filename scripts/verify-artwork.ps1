@@ -31,10 +31,10 @@ $screenW = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width
 $scale = if ($screenW -le 1600) { 1.0 } elseif ($screenW -le 2000) { 1.3 } elseif ($screenW -le 2600) { 1.5 } else { 1.7 }
 $pillExpanded = [int][math]::Round(380 * $scale)
 $pillLeft = [int](($screenW - $pillExpanded) / 2)
-if ($ArtW -eq 0) { $ArtW = [int][math]::Round(52 * $scale) }
+if ($ArtW -eq 0) { $ArtW = [int][math]::Round(56 * $scale) }
 if ($ArtH -eq 0) { $ArtH = $ArtW }
-if ($ArtX -eq 0) { $ArtX = $pillLeft + [int][math]::Round(10 * $scale) }
-if ($ArtY -eq 0) { $ArtY = [int][math]::Round(10 * $scale) }
+if ($ArtX -eq 0) { $ArtX = $pillLeft + [int][math]::Round(12 * $scale) }
+if ($ArtY -eq 0) { $ArtY = [int][math]::Round(12 * $scale) }
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 Add-Type @"
 using System;

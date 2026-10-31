@@ -19,8 +19,8 @@ $screenW = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width
 $scale = if ($screenW -le 1600) { 1.0 } elseif ($screenW -le 2000) { 1.3 } elseif ($screenW -le 2600) { 1.5 } else { 1.7 }
 $pillExpanded = [int][math]::Round(380 * $scale)
 $pillLeft = [int](($screenW - $pillExpanded) / 2)
-$pad = [int][math]::Round(10 * $scale)
-$artSize = [int][math]::Round(52 * $scale)
+$pad = [int][math]::Round(12 * $scale)
+$artSize = [int][math]::Round(56 * $scale)
 $artX = $pillLeft + $pad
 $artY = $pad
 

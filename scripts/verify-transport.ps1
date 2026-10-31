@@ -90,7 +90,8 @@ function Move-To([int]$tx, [int]$ty) {
 }
 
 function Capture-Strip {
-    $bmp = New-Object System.Drawing.Bitmap $StripW, 110
+    # Tinggi pita harus menutup kartu yang membesar (122 px * skala) sampai baris tombol.
+    $bmp = New-Object System.Drawing.Bitmap $StripW, 200
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.CopyFromScreen($StripX, 0, 0, 0, (New-Object System.Drawing.Size $StripW, 110))
     $g.Dispose()
@@ -113,9 +114,13 @@ function Measure-DiffWidth($baseline, $frame) {
             $diff[$x] = ($d -gt 24 -and $gelap)
         }
         if (-not $diff[$center]) { continue }
+        # Batas kiri/kanan = kartu terlebar yang mungkin; noise dari jendela lain di belakang
+        # tidak boleh memperpanjang run.
+        $limitL = [math]::Max(0, $center - $expandedExpect / 2 - 12)
+        $limitR = [math]::Min($StripW - 1, $center + $expandedExpect / 2 + 12)
         $l = $center; $r = $center
-        while ($l -gt 0 -and $diff[$l - 1]) { $l-- }
-        while ($r -lt ($StripW - 1) -and $diff[$r + 1]) { $r++ }
+        while ($l -gt $limitL -and $diff[$l - 1]) { $l-- }
+        while ($r -lt $limitR -and $diff[$r + 1]) { $r++ }
         $w = $r - $l + 1
         if ($w -gt $best) { $best = $w }
     }
@@ -129,60 +134,6 @@ function Click-Client([IntPtr]$hwnd, [int]$cx, [int]$cy) {
     [TransportCtl]::PostMessageW($hwnd, 0x0201, [IntPtr]1, $lp) | Out-Null
     Start-Sleep -Milliseconds 40
     [TransportCtl]::PostMessageW($hwnd, 0x0202, [IntPtr]0, $lp) | Out-Null
-}
-
-# Deteksi baris tombol dari piksel. Klaster dihitung dari kolom yang punya piksel terang di
-# pita bawah pill (y 55..90), bukan dari satu baris: satu baris bisa jatuh di bagian ikon yang
-# kosong sehingga jumlah klaster kurang dari tiga. Jendela x dibatasi ke tengah pill (900..1020)
-# supaya artwork yang juga terang tidak ikut terhitung.
-function Find-Buttons($frame) {
-    # Kartu tumbuh mengikuti $scale, jadi jendela deteksi juga.
-    $x0 = [int](960 - 90 * $scale) - $StripX
-    $x1 = [int](960 + 90 * $scale) - $StripX
-    $y0 = [int](52 * $scale); $y1 = [int](100 * $scale)
-    $clusters = @()
-    $start = -1
-    for ($x = $x0; $x -lt $x1; $x++) {
-        $lit = $false
-        for ($y = $y0; $y -lt $y1; $y++) {
-            $c = $frame.GetPixel($x, $y)
-            if ($c.R -gt 150 -and $c.G -gt 150 -and $c.B -gt 150) { $lit = $true; break }
-        }
-        if ($lit -and $start -lt 0) { $start = $x }
-        elseif (-not $lit -and $start -ge 0) {
-            $clusters += [pscustomobject]@{ Awal = $start; Akhir = $x - 1 }
-            $start = -1
-        }
-    }
-    if ($start -ge 0) { $clusters += [pscustomobject]@{ Awal = $start; Akhir = $x1 - 1 } }
-    if ($clusters.Count -lt 3) { return $null }
-
-    $merged = @()
-    foreach ($c in $clusters) {
-        if ($merged.Count -gt 0 -and ($c.Awal - $merged[-1].Akhir) -lt 4) { $merged[-1].Akhir = $c.Akhir }
-        else { $merged += [pscustomobject]@{ Awal = $c.Awal; Akhir = $c.Akhir } }
-    }
-    if ($merged.Count -lt 3) { return $null }
-
-    $centers = @($merged | ForEach-Object { [int](($_.Awal + $_.Akhir) / 2) })
-    $mid = [int][math]::Floor($centers.Count / 2)
-
-    $sumY = 0.0; $nY = 0
-    for ($x = $merged[$mid].Awal; $x -le $merged[$mid].Akhir; $x++) {
-        for ($y = $y0; $y -lt $y1; $y++) {
-            $c = $frame.GetPixel($x, $y)
-            if ($c.R -gt 150 -and $c.G -gt 150 -and $c.B -gt 150) { $sumY += $y; $nY++ }
-        }
-    }
-    $rowY = if ($nY -gt 0) { [int]($sumY / $nY) } else { $RowY }
-
-    return [pscustomobject]@{
-        PrevX  = $centers[$mid - 1] + $StripX - 750
-        PlayX  = $centers[$mid] + $StripX - 750
-        NextX  = $centers[$mid + 1] + $StripX - 750
-        RowY   = $rowY
-        Jumlah = $merged.Count
-    }
 }
 
 if (-not (Test-Path $Exe)) { "EXE_TIDAK_ADA: $Exe"; exit 2 }
@@ -249,19 +200,20 @@ Move-To 960 16
 Start-Sleep -Milliseconds 1200
 $f = Capture-Strip
 $wExpanded = Measure-DiffWidth $baseline $f
-$f.Dispose()
 "lebar_expanded={0}px (harapan {1}, skala {2})" -f $wExpanded, $expandedExpect, $scale
 
-# Deteksi posisi tombol dari kartu yang sedang terbuka; tata letak kartu bisa berubah.
-$fDeteksi = Capture-Strip
-$tombol = Find-Buttons $fDeteksi
-$fDeteksi.Dispose()
-if ($null -ne $tombol) {
-    $PrevX = $tombol.PrevX; $PlayX = $tombol.PlayX; $NextX = $tombol.NextX; $RowY = $tombol.RowY
-    "tombol_terdeteksi={0} prev_x={1} play_x={2} next_x={3} row_y={4}" -f $tombol.Jumlah, $PrevX, $PlayX, $NextX, $RowY
-} else {
-    "tombol_terdeteksi=0 (memakai koordinat parameter: {0}/{1}/{2} y={3})" -f $PrevX, $PlayX, $NextX, $RowY
-}
+# Deteksi posisi tombol dari tangkapan yang sama (kartu sedang terbuka).
+# Koordinat tombol dari rumus geometri kartu (sumber sama dengan ui/notch.slint):
+# tombol 34 px, spacing 20 px, konten padding 12 px, artwork 56 px.
+# Pusat kartu = lebar window / 2; jarak antar-pusat = 54 px * skala; baris tombol = 91 px * skala.
+$winW = 420 * $scale
+$cardCenter = [int]($winW / 2)
+$off = [int](54 * $scale)
+$PrevX = $cardCenter - $off
+$PlayX = $cardCenter
+$NextX = $cardCenter + $off
+$RowY = [int](91 * $scale)
+"koordinat_tombol: prev={0} play={1} next={2} y={3} (skala {4})" -f $PrevX, $PlayX, $NextX, $RowY, $scale
 
 $statusAwal = (Get-CurrentMedia).Status
 $lulus = 0

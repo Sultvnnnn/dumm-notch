@@ -35,17 +35,17 @@ Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
 $screenW = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width
 $scale = if ($screenW -le 1600) { 1.0 } elseif ($screenW -le 2000) { 1.3 } elseif ($screenW -le 2600) { 1.5 } else { 1.7 }
 $pillW = [int][math]::Round(380 * $scale)
-$pillH = [int][math]::Round(100 * $scale)
+$pillH = [int][math]::Round(122 * $scale)
 $pillLeft = [int](($screenW - $pillW) / 2)
 # Pita bar HUD: 15 px terakhir di bagian bawah pill.
 $BandX = $pillLeft; $BandW = $pillW
-$BandY = $pillH - [int][math]::Round(18 * $scale); $BandH = [int][math]::Round(16 * $scale)
+$BandY = $pillH - [int][math]::Round(22 * $scale); $BandH = [int][math]::Round(20 * $scale)
 # Kotak label persen di kanan bar.
 $LabelW = [int][math]::Round(50 * $scale); $LabelH = [int][math]::Round(14 * $scale)
-$LabelX = $pillLeft + $pillW - $LabelW - [int][math]::Round(10 * $scale); $LabelY = $BandY
+$LabelX = $pillLeft + $pillW - $LabelW - [int][math]::Round(12 * $scale); $LabelY = $BandY
 # Tepi kiri/kanan pita bar untuk cek radius.
 $EdgeW = [int][math]::Round(6 * $scale); $EdgeH = [int][math]::Round(4 * $scale)
-$EdgeY = $pillH - [int][math]::Round(6 * $scale)
+$EdgeY = $pillH - [int][math]::Round(7 * $scale)
 
 function Move-To([int]$tx, [int]$ty) {
     $pt = New-Object System.Drawing.Point

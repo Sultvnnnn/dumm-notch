@@ -4,8 +4,12 @@ export component MainWindow inherits Window {
     background: transparent;
     always-on-top: true;
 
-    width: 420px;
-    height: 160px;
+    // Skala antarmuka. Diisi main.rs dari ukuran layar (1920 -> 1.3, 2560 -> 1.6, dst).
+    // Semua ukuran di bawah dikalikan `scale`, jadi notch membesar di monitor besar.
+    in property <float> scale: 1.0;
+
+    width: 420px * root.scale;
+    height: 124px * root.scale;
 
     in-out property <bool> is_expanded: false;
     // Diisi layanan media; string kosong berarti tidak ada sesi.
@@ -19,16 +23,17 @@ export component MainWindow inherits Window {
     in property <string> duration-label;
     in property <float> volume-level: 0.0;
     in property <bool> volume-muted: false;
-    // V2: false sampai main.rs menyelesaikan pembaruan volume pertama (baseline). Selama
-    // false, perubahan volume-level tidak memunculkan HUD sehingga tidak berkedip saat start.
+    // V2: false sampai main.rs menyelesaikan pembaruan volume pertama (baseline).
     in property <bool> volume-ready: false;
     in-out property <bool> hud-visible: false;
+    // 0 = tidak ada, 1 = previous, 2 = play/pause, 3 = next. Diturunkan dari posisi kursor.
+    out property <int> hover-zone;
+
     callback play-pause();
     callback next();
     callback previous();
 
-    // Satu timer sekali-jalan untuk HUD volume. Saat idle `running == false` (tidak ada timer
-    // hidup). Trigger mematikan HUD; karena `running` terikat `hud-visible`, timer ikut mati.
+    // Satu timer sekali-jalan untuk HUD volume. Saat idle `running == false`.
     hud-timer := Timer {
         interval: 1500ms;
         running: root.hud-visible;
@@ -46,62 +51,62 @@ export component MainWindow inherits Window {
         x: (parent.width - self.width) / 2;
         y: 0px;
 
-        width: is_expanded ? 380px : 180px;
-        height: is_expanded ? 90px : 32px;
+        width: is_expanded ? 380px * root.scale : 180px * root.scale;
+        height: is_expanded ? 100px * root.scale : 34px * root.scale;
         background: #09090b;
-        border-bottom-left-radius: 18px;
-        border-bottom-right-radius: 18px;
+        border-bottom-left-radius: 18px * root.scale;
+        border-bottom-right-radius: 18px * root.scale;
 
-        animate width { duration: 250ms; easing: ease-out; }
-        animate height { duration: 250ms; easing: ease-out; }
+        // Animasi: satu easing dan satu durasi untuk semua perubahan geometri supaya terasa
+        // satu gerakan, bukan dua animasi terpisah.
+        animate width { duration: 200ms; easing: ease-in-out; }
+        animate height { duration: 200ms; easing: ease-in-out; }
 
         // Satu TouchArea untuk seluruh pill. TouchArea yang bersarang di dalam layout tidak
-        // menerima hit-test (terbukti dari pengujian klik: badan pill selalu menang), jadi
-        // tombol ditentukan dari posisi pointer di dalam area ini.
-        TouchArea {
+        // menerima hit-test; tombol dibedakan dari posisi pointer di dalam area ini.
+        ta := TouchArea {
             mouse-cursor: pointer;
             changed has-hover => {
                 root.is_expanded = self.has-hover;
             }
 
+            // Klik di mana saja pada kartu: sepertiga kiri = previous, sepertiga kanan = next,
+            // sisanya play/pause. Ikon hanya penanda visual.
             clicked => {
                 if (root.is_expanded) {
-                    // Baris tombol berada 4-26 px dari tepi bawah pill, dengan pusat
-                    // di width/2 - 26, width/2, width/2 + 26 (spacing 8 px + ikon 18 px).
-                    if (self.mouse-y >= self.height - 26px && self.mouse-y <= self.height - 4px) {
-                        if (self.mouse-x < self.width / 2 - 13px) {
-                            root.previous();
-                        } else if (self.mouse-x > self.width / 2 + 13px) {
-                            root.next();
-                        } else {
-                            root.play-pause();
-                        }
+                    if (self.mouse-x < self.width * 0.33) {
+                        root.previous();
+                    } else if (self.mouse-x > self.width * 0.67) {
+                        root.next();
+                    } else {
+                        root.play-pause();
                     }
                 }
             }
         }
 
         VerticalLayout {
-            padding: 6px;
-            spacing: 1px;
+            padding: 10px * root.scale;
+            spacing: 6px * root.scale;
             alignment: center;
 
             if !root.is_expanded: Text {
                 text: "Dumm";
                 color: #f4f4f5;
-                font-size: 12px;
+                font-size: 12px * root.scale;
                 overflow: elide;
                 horizontal-alignment: center;
             }
 
-            // Baris 1: artwork di kiri, judul + artis rata kiri di kanannya.
+            // Baris 1: artwork besar di kiri, teks + bar progres + waktu di kanan.
             if root.is_expanded: HorizontalLayout {
-                spacing: 8px;
+                spacing: 12px * root.scale;
                 alignment: start;
 
                 Rectangle {
-                    width: 42px; height: 42px;
-                    border-radius: 8px;
+                    width: 52px * root.scale;
+                    height: 52px * root.scale;
+                    border-radius: 10px * root.scale;
                     background: #18181b;
                     clip: true;
                     Image { source: root.media-artwork; image-fit: cover; }
@@ -109,92 +114,106 @@ export component MainWindow inherits Window {
 
                 VerticalLayout {
                     alignment: center;
-                    spacing: 0px;
+                    spacing: 3px * root.scale;
+
                     Text {
                         text: root.media-title != "" ? root.media-title : "Dumm Active";
                         color: #f4f4f5;
-                        font-size: 13px;
+                        font-weight: 600;
+                        font-size: 14px * root.scale;
                         overflow: elide;
                         horizontal-alignment: left;
                     }
                     Text {
                         text: root.media-artist != "" ? root.media-artist : "Media & HUD Hub";
                         color: #a1a1aa;
-                        font-size: 11px;
+                        font-size: 11px * root.scale;
                         overflow: elide;
                         horizontal-alignment: left;
+                    }
+                    Rectangle {
+                        height: 3px * root.scale;
+                        border-radius: 2px;
+                        background: #27272a;
+                        Rectangle {
+                            width: parent.width * Math.max(0.0, Math.min(1.0, root.position-frac));
+                            height: parent.height;
+                            border-radius: 2px;
+                            background: #f4f4f5;
+                        }
+                    }
+                    if root.duration-label != "": Rectangle {
+                        height: 10px * root.scale;
+                        Text {
+                            x: 0px;
+                            text: root.position-label;
+                            color: #a1a1aa;
+                            font-size: 9px * root.scale;
+                            horizontal-alignment: left;
+                        }
+                        Text {
+                            x: parent.width - 60px * root.scale;
+                            width: 60px * root.scale;
+                            text: root.duration-label;
+                            color: #a1a1aa;
+                            font-size: 9px * root.scale;
+                            horizontal-alignment: right;
+                        }
                     }
                 }
             }
 
-            // Baris 2: progress bar tipis.
-            if root.is_expanded: Rectangle {
-                height: 3px;
-                border-radius: 2px;
-                background: #27272a;
-                Rectangle {
-                    width: parent.width * Math.max(0.0, Math.min(1.0, root.position-frac));
-                    height: parent.height;
-                    border-radius: 2px;
-                    background: #f4f4f5;
-                }
-            }
-
-            // Baris 3: waktu berjalan (kiri) dan durasi (kanan). Tersembunyi bila timeline kosong.
-            if root.is_expanded && root.duration-label != "": Rectangle {
-                height: 10px;
-                Text {
-                    x: 0px;
-                    text: root.position-label;
-                    color: #a1a1aa;
-                    font-size: 9px;
-                    horizontal-alignment: left;
-                }
-                Text {
-                    x: parent.width - 44px;
-                    width: 44px;
-                    text: root.duration-label;
-                    color: #a1a1aa;
-                    font-size: 9px;
-                    horizontal-alignment: right;
-                }
-            }
-
-            // Baris 4: kontrol transport, di tengah.
+            // Baris 2: kontrol transport di tengah, dengan sorotan saat kursor di atasnya.
             if root.is_expanded: HorizontalLayout {
                 alignment: center;
-                spacing: 8px;
+                spacing: 24px * root.scale;
 
-                // Ikon Phosphor (MIT), bobot fill. Ikon hanya tampilan; yang menangkap klik
-                // adalah TouchArea di atas.
-                Image {
-                    width: 18px; height: 18px;
-                    source: @image-url("../assets/icons/skip-back.svg");
+                Rectangle {
+                    width: 32px * root.scale; height: 32px * root.scale;
+                    border-radius: 8px * root.scale;
+                    background: root.hover-zone == 1 ? #1f1f23 : transparent;
+                    Image {
+                        width: 18px * root.scale; height: 18px * root.scale;
+                        source: @image-url("../assets/icons/skip-back.svg");
+                    }
                 }
-                Image {
-                    width: 18px; height: 18px;
-                    source: root.is-playing
-                        ? @image-url("../assets/icons/pause.svg")
-                        : @image-url("../assets/icons/play.svg");
+                Rectangle {
+                    width: 32px * root.scale; height: 32px * root.scale;
+                    border-radius: 8px * root.scale;
+                    background: root.hover-zone == 2 ? #1f1f23 : transparent;
+                    Image {
+                        width: 18px * root.scale; height: 18px * root.scale;
+                        source: root.is-playing
+                            ? @image-url("../assets/icons/pause.svg")
+                            : @image-url("../assets/icons/play.svg");
+                    }
                 }
-                Image {
-                    width: 18px; height: 18px;
-                    source: @image-url("../assets/icons/skip-forward.svg");
+                Rectangle {
+                    width: 32px * root.scale; height: 32px * root.scale;
+                    border-radius: 8px * root.scale;
+                    background: root.hover-zone == 3 ? #1f1f23 : transparent;
+                    Image {
+                        width: 18px * root.scale; height: 18px * root.scale;
+                        source: @image-url("../assets/icons/skip-forward.svg");
+                    }
                 }
             }
         }
     }
 
-    // HUD volume: bar 4 px di bagian bawah pill + angka persen (10 px) di kanan. Anak root
-    // (bukan pill) agar bebas diposisikan; koordinat mengikuti geometri pill sehingga tidak
-    // mengubah tinggi pill dan tidak menggeser baris ikon. Muncul saat expanded maupun collapsed.
+    // Zona hover diturunkan langsung dari posisi kursor: tidak perlu callback `moved`
+    // (yang hanya menyala saat tombol ditekan), cukup properti mouse-x yang selalu diperbarui
+    // selama kursor berada di area ini.
+    hover-zone: root.is_expanded && ta.has-hover
+        ? (ta.mouse-x < ta.width * 0.33 ? 1 : (ta.mouse-x > ta.width * 0.67 ? 3 : 2))
+        : 0;
+
+    // HUD volume: bar 4 px di bagian bawah pill + angka persen di kanan.
     if root.hud-visible: Rectangle {
-        // V3: margin horizontal 12 px (radius 18 px) agar bar tidak menyentuh tepi
-        // membulat pill sehingga ujung bawah tidak tampak persegi.
-        x: pill.x + 12px;
-        y: pill.y + pill.height - 6px;
-        width: pill.width - 24px;
-        height: 4px;
+        x: pill.x + 12px * root.scale;
+        y: pill.y + pill.height - 6px * root.scale;
+        width: pill.width - 24px * root.scale;
+        height: 4px * root.scale;
         border-radius: 2px;
         background: #27272a;
         Rectangle {
@@ -207,13 +226,13 @@ export component MainWindow inherits Window {
         }
     }
     if root.hud-visible: Text {
-        x: pill.x + pill.width - 50px;
-        y: pill.y + pill.height - 16px;
-        width: 44px;
-        height: 12px;
+        x: pill.x + pill.width - 50px * root.scale;
+        y: pill.y + pill.height - 16px * root.scale;
+        width: 44px * root.scale;
+        height: 12px * root.scale;
         text: root.volume-muted ? "Muted" : "\{Math.round(root.volume-level * 100)}%";
         color: #f4f4f5;
-        font-size: 10px;
+        font-size: 10px * root.scale;
         horizontal-alignment: right;
     }
 }

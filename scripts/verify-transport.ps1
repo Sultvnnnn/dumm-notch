@@ -28,6 +28,12 @@ param(
 )
 
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+
+# Skala antarmuka, aturan sama dengan main.rs.
+$screenW = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width
+$scale = if ($screenW -le 1600) { 1.0 } elseif ($screenW -le 2000) { 1.3 } elseif ($screenW -le 2600) { 1.5 } else { 1.7 }
+$expandedExpect = [int][math]::Round(380 * $scale)
+$expandedTol = [int][math]::Round(10 * $scale)
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
@@ -130,8 +136,10 @@ function Click-Client([IntPtr]$hwnd, [int]$cx, [int]$cy) {
 # kosong sehingga jumlah klaster kurang dari tiga. Jendela x dibatasi ke tengah pill (900..1020)
 # supaya artwork yang juga terang tidak ikut terhitung.
 function Find-Buttons($frame) {
-    $x0 = 900 - $StripX; $x1 = 1020 - $StripX
-    $y0 = 55; $y1 = 90
+    # Kartu tumbuh mengikuti $scale, jadi jendela deteksi juga.
+    $x0 = [int](960 - 90 * $scale) - $StripX
+    $x1 = [int](960 + 90 * $scale) - $StripX
+    $y0 = [int](52 * $scale); $y1 = [int](100 * $scale)
     $clusters = @()
     $start = -1
     for ($x = $x0; $x -lt $x1; $x++) {
@@ -242,7 +250,7 @@ Start-Sleep -Milliseconds 1200
 $f = Capture-Strip
 $wExpanded = Measure-DiffWidth $baseline $f
 $f.Dispose()
-"lebar_expanded={0}px (harapan 380)" -f $wExpanded
+"lebar_expanded={0}px (harapan {1}, skala {2})" -f $wExpanded, $expandedExpect, $scale
 
 # Deteksi posisi tombol dari kartu yang sedang terbuka; tata letak kartu bisa berubah.
 $fDeteksi = Capture-Strip
@@ -288,7 +296,7 @@ for ($i = 1; $i -le $Cycles; $i++) {
     $wNow = Measure-DiffWidth $baseline $f
     $f.Dispose()
 
-    $ok = ($null -ne $delta) -and ($delta -le 500) -and ($wNow -ge 372 -and $wNow -le 388)
+    $ok = ($null -ne $delta) -and ($delta -le 700) -and ($wNow -ge ($expandedExpect - $expandedTol) -and $wNow -le ($expandedExpect + $expandedTol))
     if ($ok) { $lulus++ }
     "iterasi {0}: sebelum={1} sesudah={2} berubah={3} delta_ms={4} lebar={5}px -> {6}" -f `
         $i, $sebelum, $sesudah, ($null -ne $delta), $(if ($null -ne $delta) { $delta } else { "-" }), $wNow, $(if ($ok) { "OK" } else { "GAGAL" })
@@ -304,6 +312,17 @@ Start-Sleep -Milliseconds 600
 $mPrev = Get-CurrentMedia
 "uji_next: sesi='{0}' status={1} hidup={2}" -f $(if ($mNext) { $mNext.Title } else { "-" }), $(if ($mNext) { $mNext.Status } else { "-" }), (-not $p.HasExited)
 "uji_previous: sesi='{0}' status={1} hidup={2}" -f $(if ($mPrev) { $mPrev.Title } else { "-" }), $(if ($mPrev) { $mPrev.Status } else { "-" }), (-not $p.HasExited)
+
+# Uji zona klik "di mana saja": sepertiga kiri = previous, sepertiga kanan = next.
+# Klik dilakukan di koordinat klien, bukan di ikon, untuk membuktikan zona bukan cuma ikon.
+$judulSebelum = (Get-CurrentMedia).Title
+Click-Client $hwnd ([int](420 * $scale * 0.20)) ([int](50 * $scale))
+Start-Sleep -Milliseconds 900
+$judulKanan = (Get-CurrentMedia).Title
+Click-Client $hwnd ([int](420 * $scale * 0.80)) ([int](50 * $scale))
+Start-Sleep -Milliseconds 900
+$judulKiri = (Get-CurrentMedia).Title
+"zona_klik: awal='{0}' setelah_klik_kanan='{1}' setelah_klik_kiri='{2}'" -f $judulSebelum, $judulKanan, $judulKiri
 
 $akhir = (Get-CurrentMedia).Status
 "status_awal_uji={0} status_akhir={1} skip_identitas={2}" -f $statusAwal, $akhir, $skipIdentitas

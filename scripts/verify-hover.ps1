@@ -10,8 +10,9 @@
 param(
     [string]$Exe = "D:\codingan\dumm-notch\target\release\dum-notch.exe",
     [int]$Cycles = 10,
-    [int]$IdleWidth = 180,
-    [int]$ExpandedWidth = 380,
+    # 0 = hitung otomatis dari lebar layar memakai aturan yang sama dengan main.rs.
+    [int]$IdleWidth = 0,
+    [int]$ExpandedWidth = 0,
     [int]$Tolerance = 8,
     [int]$ScanRow = 8,
     [int]$StripX = 600,
@@ -19,6 +20,13 @@ param(
 )
 
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+
+# Skala antarmuka: main.rs memakai 1.0 (<=1600), 1.3 (<=2000), 1.5 (<=2600), 1.7 (>2600).
+$screenW = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width
+$scale = if ($screenW -le 1600) { 1.0 } elseif ($screenW -le 2000) { 1.3 } elseif ($screenW -le 2600) { 1.5 } else { 1.7 }
+if ($IdleWidth -eq 0) { $IdleWidth = [int][math]::Round(180 * $scale) }
+if ($ExpandedWidth -eq 0) { $ExpandedWidth = [int][math]::Round(380 * $scale) }
+"skala={0} lebar_harapan idle={1} expanded={2}" -f $scale, $IdleWidth, $ExpandedWidth
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;

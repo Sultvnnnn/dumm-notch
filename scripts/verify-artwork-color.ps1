@@ -13,6 +13,17 @@ param(
 )
 
 Add-Type -AssemblyName System.Drawing, System.Runtime.WindowsRuntime
+# Skala antarmuka (aturan sama dengan main.rs) dan geometri turunannya.
+Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+$screenW = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width
+$scale = if ($screenW -le 1600) { 1.0 } elseif ($screenW -le 2000) { 1.3 } elseif ($screenW -le 2600) { 1.5 } else { 1.7 }
+$pillExpanded = [int][math]::Round(380 * $scale)
+$pillLeft = [int](($screenW - $pillExpanded) / 2)
+$pad = [int][math]::Round(10 * $scale)
+$artSize = [int][math]::Round(52 * $scale)
+$artX = $pillLeft + $pad
+$artY = $pad
+
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
@@ -127,18 +138,20 @@ Start-Sleep -Seconds 4
 Move-To 960 16
 Start-Sleep -Milliseconds 1300
 
-$card = New-Object System.Drawing.Bitmap 40, 40
+"geometri_artwork: x={0} y={1} size={2} skala={3}" -f $artX, $artY, $artSize, $scale
+$card = New-Object System.Drawing.Bitmap $artSize, $artSize
 $g = [System.Drawing.Graphics]::FromImage($card)
-$g.CopyFromScreen(776, 6, 0, 0, (New-Object System.Drawing.Size 40, 40))
+$g.CopyFromScreen($artX, $artY, 0, 0, (New-Object System.Drawing.Size $artSize, $artSize))
 $g.Dispose()
 $saved = Join-Path $env:TEMP 'dumm-artwork-kontrol-kartu.png'
 $card.Save($saved, [System.Drawing.Imaging.ImageFormat]::Png)
 
+$q1 = [int]($artSize * 0.25); $q3 = [int]($artSize * 0.75)
 $ujian = @(
-    @{ nama = 'merah (kiri atas)'; x = 10; y = 10; r = 255; g = 0; b = 0 },
-    @{ nama = 'hijau (kanan atas)'; x = 30; y = 10; r = 0; g = 255; b = 0 },
-    @{ nama = 'biru  (kiri bawah)'; x = 10; y = 30; r = 0; g = 0; b = 255 },
-    @{ nama = 'putih (kanan bawah)'; x = 30; y = 30; r = 255; g = 255; b = 255 }
+    @{ nama = 'merah (kiri atas)'; x = $q1; y = $q1; r = 255; g = 0; b = 0 },
+    @{ nama = 'hijau (kanan atas)'; x = $q3; y = $q1; r = 0; g = 255; b = 0 },
+    @{ nama = 'biru  (kiri bawah)'; x = $q1; y = $q3; r = 0; g = 0; b = 255 },
+    @{ nama = 'putih (kanan bawah)'; x = $q3; y = $q3; r = 255; g = 255; b = 255 }
 )
 $lulus = 0
 foreach ($u in $ujian) {

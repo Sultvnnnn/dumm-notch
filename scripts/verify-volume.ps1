@@ -30,13 +30,22 @@ $VK_VOLUME_UP = 0xAF
 $VK_VOLUME_DOWN = 0xAE
 $KEYUP = 0x0002
 
-# Geometri layar (1920x1080, window di tengah atas).
-# Pill expanded: x 770, lebar 380, tinggi 90; bar HUD y 84..88 (V3: x 782..1138).
-$BandX = 770; $BandY = 76; $BandW = 380; $BandH = 15
-# Kotak label persen (x 1094..1144, y 72..86).
-$LabelX = 1094; $LabelY = 72; $LabelW = 50; $LabelH = 14
-# Tepi kiri/kanan pita bar untuk cek radius (6 px paling luar).
-$EdgeW = 6; $EdgeY = 84; $EdgeH = 4
+# Geometri layar mengikuti skala antarmuka (aturan sama dengan main.rs).
+Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+$screenW = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width
+$scale = if ($screenW -le 1600) { 1.0 } elseif ($screenW -le 2000) { 1.3 } elseif ($screenW -le 2600) { 1.5 } else { 1.7 }
+$pillW = [int][math]::Round(380 * $scale)
+$pillH = [int][math]::Round(100 * $scale)
+$pillLeft = [int](($screenW - $pillW) / 2)
+# Pita bar HUD: 15 px terakhir di bagian bawah pill.
+$BandX = $pillLeft; $BandW = $pillW
+$BandY = $pillH - [int][math]::Round(18 * $scale); $BandH = [int][math]::Round(16 * $scale)
+# Kotak label persen di kanan bar.
+$LabelW = [int][math]::Round(50 * $scale); $LabelH = [int][math]::Round(14 * $scale)
+$LabelX = $pillLeft + $pillW - $LabelW - [int][math]::Round(10 * $scale); $LabelY = $BandY
+# Tepi kiri/kanan pita bar untuk cek radius.
+$EdgeW = [int][math]::Round(6 * $scale); $EdgeH = [int][math]::Round(4 * $scale)
+$EdgeY = $pillH - [int][math]::Round(6 * $scale)
 
 function Move-To([int]$tx, [int]$ty) {
     $pt = New-Object System.Drawing.Point
@@ -129,7 +138,9 @@ for ($i = 0; $i -lt 40; $i++) {
     Start-Sleep -Milliseconds 100
 }
 Start-Sleep -Milliseconds 1000   # t=1,0 s setelah window tampil
-$blinkBmp = Capture-Region 895 24 130 8
+# Pita bawah pill collapsed, ikut skala: pill collapsed 180x34.
+$collapseH = [int][math]::Round(34 * $scale)
+$blinkBmp = Capture-Region ([int](960 - 65 * $scale)) ([int]($collapseH - 10 * $scale)) ([int](130 * $scale)) ([int](8 * $scale))
 $blinkBright = Count-Bright $blinkBmp
 $blinkBmp.Dispose()
 $noBlink = ($blinkBright -lt 20)
@@ -163,7 +174,8 @@ for ($i = 1; $i -le 5; $i++) {
     $labelBmp = Capture-Region $LabelX $LabelY $LabelW $LabelH
     $labelBright = Count-Bright $labelBmp
     $labelBmp.Dispose()
-    $labelOk = $labelOk -and ($labelBright -ge 8 -and $labelBright -le 45)
+    $labelMin = [int](8 * $scale * $scale); $labelMax = [int](45 * $scale * $scale)
+    $labelOk = $labelOk -and ($labelBright -ge $labelMin -and $labelBright -le $labelMax)
 
     # ===== Cek 3: tepi bar tidak menyentuh radius =====
     # Periksa warna bar terang #f4f4f5 spesifik (bukan kecerahan umum — sudut membulat
@@ -184,6 +196,11 @@ for ($i = 1; $i -le 5; $i++) {
     $d2 = Measure-DiffCount $baseline $f2
     $f2.Dispose()
     $hilang = ($d2 -le 50)
+
+    # Kembalikan satu langkah: kalau tidak, pada iterasi ke-5 endpoint mentok 100% dan
+    # VK_VOLUME_UP tidak mengubah apa pun sehingga HUD absen (perilaku benar).
+    Send-VolKey $VK_VOLUME_DOWN
+    Start-Sleep -Milliseconds 200
 
     if ($muncul -and $hilang) { $lulus++ }
     "iterasi $i`: muncul=$muncul hilang=$hilang diff300=$d1 diff2200=$d2 label_bright=$labelBright tepi_kiri=$leftBright tepi_kanan=$rightBright private=$privateBytes"

@@ -151,6 +151,18 @@ konversi ke RGBA → scale → **konversi sekali lagi ke RGBA tepat sebelum `Cop
 regresinya `scripts/verify-artwork-color.ps1`, yang memutar artwork kontrol empat kuadran
 (merah, hijau, biru, putih) dan membandingkan nilai piksel di kartu; selisih 0 berarti kanal benar.
 
+**Ukuran mengikuti layar.** Kartu tidak lagi berukuran tetap: `main.rs` menghitung `scale`
+dari `GetSystemMetrics(SM_CXSCREEN)` (≤1600 → 1.0, ≤2000 → 1.3, ≤2600 → 1.5, >2600 → 1.7) dan
+seluruh ukuran di `.slint` dikalikan `scale`. Di layar 1920 kartu menjadi 494×130 dengan artwork
+68 px, bukan lagi 380×90 dengan artwork 40 px. Konsekuensinya semua harness wajib menghitung
+geometri dari `scale` yang sama — koordinat tetap sudah tidak berlaku.
+
+**Zona interaksi.** Klik tidak lagi dibatasi pada baris ikon: sepertiga kiri kartu = previous,
+sepertiga kanan = next, tengah = play/pause, dan hover per-zona diturunkan dari `ta.mouse-x`
+(callback `moved` tidak bisa dipakai karena hanya menyala saat tombol ditekan). Animasi
+geometri memakai satu easing `ease-in-out` 200 ms untuk lebar dan tinggi supaya terasa satu
+gerakan.
+
 **Timeline dan progress bar.** Posisi dan durasi dibaca dari `GetTimelineProperties()` saat
 snapshot event, jadi bar mencerminkan posisi terakhir yang dilaporkan pemutar, bukan animasi
 mulus. Ini keputusan sadar: animasi posisi memerlukan timer 1 Hz di thread UI, dan itu

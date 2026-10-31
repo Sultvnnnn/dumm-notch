@@ -28,6 +28,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .select()?;
 
     let main_window = MainWindow::new()?;
+    // Skala antarmuka mengikuti lebar layar utama: kartu 380x100 terlalu kecil untuk monitor
+    // 1920 ke atas, dan ukuran tetap membuat tata letak terasa rapat.
+    // SAFETY: GetSystemMetrics hanya membaca metrik sistem, tidak menyentuh pointer.
+    let screen_width = unsafe { windows::Win32::UI::WindowsAndMessaging::GetSystemMetrics(
+        windows::Win32::UI::WindowsAndMessaging::SM_CXSCREEN,
+    ) };
+    let scale = match screen_width {
+        w if w <= 1600 => 1.0,
+        w if w <= 2000 => 1.3,
+        w if w <= 2600 => 1.5,
+        _ => 1.7,
+    };
+    main_window.set_scale(scale);
+
     main_window.show()?;
     window::init_overlay(&main_window);
 
